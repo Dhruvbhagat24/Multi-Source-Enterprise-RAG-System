@@ -1,0 +1,126 @@
+my Current plan for the first few steps:
+Figure out a way to:
+1. Get the data from the various sources(docs,pdfs,sheets,slides)
+2. Process this so that it gets ready for the RAG pipeline
+3. Implement the vector search pipeline
+4. try to implement source citations in the responses
+5. Keep the code structure as modular as it can be
+
+
+
+
+
+I have found a way to implement rag on a pdf easily, I would quickly implement it and check if I am able to upload multiple pdfs, also then I would work on integrating docs, slides  and sheets, 
+
+then I would start by implement the vector search query and with this my one retriever would be ready
+
+
+I would also organize the code in some sort of utils folder structure.
+
+
+Tomorrow I would start with building a plug and plug system for AI model for LLM and Embeddings.
+
+Would refactor the pipeline to handle multiple pdfs, would start with docs, sheets.
+
+
+now important thing is that it works for single pdfs, just a model limitation of images which can be dealt later so all this:
+Split roles
+
+summarizer (cheap, local)
+
+answerer (better, maybe cloud)
+
+Disable image passing for Ollama
+
+Add fallback chain
+
+Add latency + token logging
+
+enforce this contract with type checks
+
+add fallback chains
+
+split summarizer vs answerer models
+
+can be done later following the modular way of solving problems just like we did today, but first I want to work on the next step:
+handle multiple pdfs, and work with docs, sheets.
+
+So that would be all for today let's work on it tomorrow.
+DONE FOR THE DAY.
+
+
+
+#________________________________________________________________________________________________________________
+✅ What you HAVE already done (correctly)
+
+This block 👇 does count as proper document-level metadata:
+
+doc = Document(
+    page_content=enhanced_content,
+    metadata={
+        "source_id": source_id,
+        "source_file": source_file,
+        "source_type": source_type,
+        "chunk_index": i + 1,
+        "total_chunks": total_chunks,
+        "original_content": json.dumps({
+            "raw_text": content_data['text'],
+            "tables_html": content_data['tables'],
+            "images_base64": content_data['images']
+        })
+    }
+)
+
+Why this is legit and correct
+
+You have successfully added:
+
+Field	Status	Why it matters
+source_id	✅	Stable document identity
+source_file	✅	Human-readable attribution
+source_type	✅	Routing & filtering
+chunk_index	✅	Debugging / ordering
+total_chunks	✅	Context reconstruction
+original_content	✅	Grounded answer generation
+
+This is real document-level metadata, not a toy version.
+
+So no — you are not missing document-level metadata.
+
+❗ Why I still paused you here (important)
+
+Even though metadata is present, there are two subtle but important follow-ups that are not bugs, but engineering completeness issues.
+
+These are the kind of things seniors think about after the system works.
+
+⚠️ What is NOT wrong, but still incomplete
+1️⃣ source_id lifecycle (currently per-run)
+
+Right now:
+
+source_id = str(uuid.uuid4())
+
+
+This means:
+
+Re-ingesting the same PDF → new source_id
+
+Old chunks remain in DB
+
+Duplicates accumulate
+
+This is acceptable for now, but later you’ll want:
+
+source_id = hash(file contents OR file path + modified time)
+
+
+This enables:
+
+safe re-ingestion
+
+deletion by source_id
+
+idempotency
+
+📌 This is NOT required today
+📌 This is a future hardening step

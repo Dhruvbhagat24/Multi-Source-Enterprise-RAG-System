@@ -1,0 +1,132 @@
+Installing System Dependencies for WINDOWS:
+
+✅ Step 1: Microsoft Visual C++ Redistributable (REQUIRED)
+What it is
+
+A Microsoft runtime library needed by many Python and AI libraries.
+
+Why it’s needed
+
+Without it, Python libraries may crash with errors like:
+
+WinError 1114
+
+Safety
+
+Made by Microsoft
+
+Used by millions of apps
+
+Very safe
+
+What to do
+
+Download from Microsoft:
+👉 https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+Run the installer
+
+Restart your computer
+
+✅ This is non-negotiable on Windows.
+
+✅ Step 2: Visual Studio Build Tools (Only for advanced features)
+What it is
+
+Microsoft’s official C++ compiler tools.
+
+Why it’s needed
+
+Some advanced document-layout models need to be compiled locally.
+
+Safety
+
+Microsoft product
+
+No background services
+
+No telemetry beyond normal Windows tools
+
+What to do
+
+Download:
+👉 https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
+During install:
+
+Select “Desktop development with C++”
+
+Finish installation
+
+⚠️ If you want basic document parsing only, you can skip this for now.
+
+✅ Step 3: Poppler (PDF Support)
+What it is
+
+An open-source PDF reader engine (not a viewer, no UI).
+
+Why it’s needed
+
+PDFs are complex. Poppler extracts text and images reliably.
+
+Safety
+
+Open-source
+
+No network access
+
+Used by many PDF tools
+
+What to do
+
+Download from GitHub:
+👉 https://github.com/oschwartz10612/poppler-windows/releases/
+
+Download the latest .zip
+
+Extract to:
+
+C:\Program Files\poppler
+
+
+Add this folder to PATH:
+
+C:\Program Files\poppler\Library\bin
+
+
+(Windows uses PATH so Python can find the tool.)
+
+✅ Step 4: Tesseract OCR (Image & Scanned PDF Text)
+What it is
+
+The most widely used OCR engine in the world.
+
+Who made it
+
+Originally Google
+
+Maintained by University of Mannheim
+
+Why it’s needed
+
+Scanned PDFs and images have no real text. OCR reads them.
+
+Safety
+
+Open-source
+
+Offline
+
+No data leaves your machine
+
+What to do
+
+Download installer:
+👉 https://github.com/UB-Mannheim/tesseract/wiki
+
+Install to:
+
+C:\Program Files\Tesseract-OCR
+
+
+Add that folder to PATH
