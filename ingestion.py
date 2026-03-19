@@ -489,24 +489,6 @@ def run_complete_ingestion_pipeline(
 
 
 
-vector_store = VectorStoreManager(persist_directory="dbv2/chroma_db")
-
-ingest_folder(
-    "./docs",
-    vector_store,
-    file_router
-)
-
-#________________________________________________________________________________________________________________
-
-# Query the vector store
-# query = "How many attention heads does the Transformer use, and what is the dimension of each head? "
-query = "What is the payment method used for TXN-004?"
-
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-
-chunks = retriever.invoke(query)
-
 def generate_final_answer(chunks, query):
     """Generate final answer using multimodal content"""
     
@@ -576,6 +558,19 @@ def generate_final_answer(chunks, query):
         print(f"❌ Answer generation failed: {e}")
         return "Sorry, I encountered an error while generating the answer."
 
-# Usage
-final_answer = generate_final_answer(chunks, query)
-print(final_answer)
+if __name__ == "__main__":
+    # Manual/local test harness only. This must not run when imported by api_server.
+    vector_store = VectorStoreManager(persist_directory="dbv2/chroma_db")
+
+    ingest_folder(
+        "./docs",
+        vector_store,
+        file_router
+    )
+
+    query = "What is the payment method used for TXN-004?"
+    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+    chunks = retriever.invoke(query)
+
+    final_answer = generate_final_answer(chunks, query)
+    print(final_answer)

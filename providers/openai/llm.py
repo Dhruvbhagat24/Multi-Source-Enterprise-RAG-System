@@ -19,7 +19,7 @@
 # But they expose only the interface, not OpenAI itself.
 
 import os
-from typing import List, Any
+from typing import List, Any, Iterator
 
 from langchain_openai import ChatOpenAI
 
@@ -54,3 +54,9 @@ class OpenAILLM(LLM):
 
         # LangChain returns an AIMessage object
         return response.content
+
+    def stream(self, messages: List[Any]) -> Iterator[str]:
+        for chunk in self.client.stream(messages):
+            content = getattr(chunk, "content", "")
+            if content:
+                yield content
