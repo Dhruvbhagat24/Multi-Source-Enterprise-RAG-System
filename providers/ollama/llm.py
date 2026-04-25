@@ -1,7 +1,7 @@
 from typing import List, Any, Iterator
 import os
 
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama  # new
 
 from core.ai_interfaces import LLM
 
@@ -20,19 +20,28 @@ class OllamaLLM(LLM):
         self.temperature = temperature
 
         # Performance-oriented defaults for local inference.
-        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
-        num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "256"))
-        keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "10m")
+        num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "1536"))
+        num_predict = int(os.getenv("OLLAMA_NUM_PREDICT", "150"))
+        keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
         base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        num_thread = int(os.getenv("OLLAMA_NUM_THREAD", "0"))  # 0 = auto-detect
+        num_gpu = int(os.getenv("OLLAMA_NUM_GPU", "-1"))  # -1 = all layers on GPU
 
-        self.client = ChatOllama(
+        kwargs = dict(
             model=self.model,
             temperature=self.temperature,
             base_url=base_url,
             num_ctx=num_ctx,
             num_predict=num_predict,
             keep_alive=keep_alive,
+            repeat_penalty=1.1,
         )
+        if num_thread > 0:
+            kwargs["num_thread"] = num_thread
+        if num_gpu >= 0:
+            kwargs["num_gpu"] = num_gpu
+
+        self.client = ChatOllama(**kwargs)
 
     def invoke(self, messages: List[Any]) -> str:
         response = self.client.invoke(messages)

@@ -1,6 +1,9 @@
 from typing import List
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:  # Backward compatibility for environments not updated yet.
+    from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from core.ai_interfaces import Embeddings
 

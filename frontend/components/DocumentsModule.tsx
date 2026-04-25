@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { uploadDocument, getDocuments, deleteDocument, type DocumentItem } from "@/lib/api";
 import { useApp } from "@/lib/store";
 
-// ─── File type icons ────────────────────────────────────────────────
+/* ─── Helpers ───────────────────────────────────────────────────────── */
 
 const fileIcons: Record<string, { icon: string; color: string }> = {
-  pdf: { icon: "📄", color: "from-red-500/20 to-red-600/10" },
-  docx: { icon: "📝", color: "from-blue-500/20 to-blue-600/10" },
-  xlsx: { icon: "📊", color: "from-green-500/20 to-green-600/10" },
-  csv: { icon: "📋", color: "from-emerald-500/20 to-emerald-600/10" },
-  default: { icon: "📎", color: "from-slate-500/20 to-slate-600/10" },
+  pdf: { icon: "📄", color: "rgba(239,68,68,0.12)" },
+  docx: { icon: "📝", color: "rgba(59,130,246,0.12)" },
+  xlsx: { icon: "📊", color: "rgba(34,197,94,0.12)" },
+  csv: { icon: "📋", color: "rgba(16,185,129,0.12)" },
+  default: { icon: "📎", color: "rgba(148,163,184,0.12)" },
 };
 
 function getFileIcon(filename: string) {
@@ -28,174 +28,126 @@ function formatBytes(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-// ─── Status Badge ───────────────────────────────────────────────────
+/* ─── Status Badge ──────────────────────────────────────────────────── */
 
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { color: string; label: string; animate: boolean }> = {
-    processing: { color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20", label: "Processing", animate: true },
-    completed: { color: "text-green-400 bg-green-500/10 border-green-500/20", label: "Completed", animate: false },
-    failed: { color: "text-red-400 bg-red-500/10 border-red-500/20", label: "Failed", animate: false },
+  const cfg: Record<string, { bg: string; color: string; label: string }> = {
+    processing: { bg: "rgba(250,204,21,0.10)", color: "#fbbf24", label: "Processing" },
+    completed: { bg: "rgba(52,211,153,0.10)", color: "#6ee7b7", label: "Completed" },
+    failed: { bg: "rgba(248,113,113,0.10)", color: "#fca5a5", label: "Failed" },
   };
-
-  const cfg = config[status] || config.processing;
-
+  const c = cfg[status] || cfg.processing;
   return (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${cfg.color} font-medium flex items-center gap-1`}>
-      {cfg.animate && (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full text-[10px] font-medium"
+      style={{ padding: "2px 8px", background: c.bg, color: c.color }}
+    >
+      {status === "processing" && (
         <motion.span
           animate={{ opacity: [1, 0.3, 1] }}
           transition={{ duration: 1.5, repeat: Infinity }}
-          className="w-1.5 h-1.5 rounded-full bg-yellow-400"
+          className="inline-block h-1.5 w-1.5 rounded-full"
+          style={{ background: c.color }}
         />
       )}
-      {cfg.label}
+      {c.label}
     </span>
   );
 }
 
-// ─── Drop Zone ──────────────────────────────────────────────────────
+/* ─── Drop Zone ─────────────────────────────────────────────────────── */
 
 function DropZone({ onUpload }: { onUpload: (files: File[]) => void }) {
   const [isDragging, setIsDragging] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => setIsDragging(false);
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    onUpload(files);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      onUpload(Array.from(e.target.files));
-    }
-  };
-
   return (
-    <motion.div
-      whileHover={{ scale: 1.01 }}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 px-8 py-10 text-center cursor-pointer flex flex-col items-center justify-center ${
-        isDragging
-          ? "border-indigo-400 bg-indigo-500/10 shadow-glow"
-          : "border-white/10 hover:border-indigo-500/30 hover:bg-white/2"
-      }`}
+    <div
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setIsDragging(false); onUpload(Array.from(e.dataTransfer.files)); }}
+      className="relative cursor-pointer rounded-xl transition-all"
+      style={{
+        border: `2px dashed ${isDragging ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.08)"}`,
+        background: isDragging ? "rgba(99,102,241,0.06)" : "transparent",
+        padding: "36px 24px",
+        textAlign: "center",
+      }}
     >
       <input
         type="file"
         multiple
         accept=".pdf,.docx,.doc,.xlsx,.xls,.csv"
-        onChange={handleFileSelect}
+        onChange={(e) => { if (e.target.files) onUpload(Array.from(e.target.files)); e.target.value = ""; }}
         className="absolute inset-0 opacity-0 cursor-pointer"
         id="file-upload-input"
         title="Upload documents"
         aria-label="Upload documents"
       />
-
-      <motion.div
-        animate={isDragging ? { y: -5, scale: 1.1 } : { y: 0, scale: 1 }}
-        className="mb-4 w-full flex justify-center"
-      >
-        <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mx-auto mb-4">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-indigo-400">
+      <div className="flex flex-col items-center">
+        <div
+          className="flex items-center justify-center rounded-xl"
+          style={{ width: 48, height: 48, background: "rgba(99,102,241,0.10)", marginBottom: 14 }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-indigo-400">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
         </div>
-      </motion.div>
-
-      <p className="text-sm text-white font-medium mb-2">
-        {isDragging ? "Drop files here" : "Drag & drop files here"}
-      </p>
-      <p className="text-xs text-slate-500">
-        or <span className="text-indigo-400 hover:underline">browse files</span>
-      </p>
-      <p className="text-[10px] text-slate-600 mt-3">
-        Supports PDF, DOCX, XLSX, CSV
-      </p>
-    </motion.div>
+        <p className="text-[13px] text-white font-medium" style={{ marginBottom: 4 }}>
+          {isDragging ? "Drop files here" : "Drag & drop files here"}
+        </p>
+        <p className="text-[12px] text-slate-500">
+          or <span className="text-indigo-400">browse files</span>
+        </p>
+        <p className="text-[10px] text-slate-600" style={{ marginTop: 8 }}>
+          PDF, DOCX, XLSX, CSV
+        </p>
+      </div>
+    </div>
   );
 }
 
-// ─── Document Card ──────────────────────────────────────────────────
+/* ─── Document Row ──────────────────────────────────────────────────── */
 
-function DocumentCard({
-  doc,
-  onDelete,
-}: {
-  doc: DocumentItem;
-  onDelete: (id: string) => void;
-}) {
-  const fileIcon = getFileIcon(doc.filename);
-
+function DocumentRow({ doc, onDelete }: { doc: DocumentItem; onDelete: (id: string) => void }) {
+  const fi = getFileIcon(doc.filename);
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="glass glass-hover rounded-xl p-4 group"
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      className="group flex items-center gap-3 rounded-lg transition-colors hover:bg-white/[0.03]"
+      style={{ padding: "10px 12px" }}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div className={`w-10 h-10 rounded-lg bg-linear-to-br ${fileIcon.color} flex items-center justify-center text-lg shrink-0`}>
-            {fileIcon.icon}
-          </div>
-          <div>
-            <p className="text-sm text-white font-medium truncate max-w-50">
-              {doc.filename}
-            </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {formatBytes(doc.size)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={doc.status} />
-          <button
-            onClick={() => onDelete(doc.id)}
-            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all"
-            title={`Delete ${doc.filename}`}
-            aria-label={`Delete ${doc.filename}`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
-        </div>
+      <span
+        className="flex shrink-0 items-center justify-center rounded-lg text-[14px]"
+        style={{ width: 34, height: 34, background: fi.color }}
+      >
+        {fi.icon}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] text-white font-medium truncate">{doc.filename}</p>
+        <p className="text-[11px] text-slate-500">{formatBytes(doc.size)}</p>
       </div>
-
-      {/* Processing bar */}
-      {doc.status === "processing" && (
-        <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
-          <motion.div
-            initial={{ width: "0%" }}
-            animate={{ width: "70%" }}
-            transition={{ duration: 3, ease: "easeInOut" }}
-            className="h-full rounded-full bg-linear-to-r from-indigo-500 to-purple-500"
-          />
-        </div>
-      )}
-
-      {doc.error && (
-        <p className="text-[10px] text-red-400 mt-2">Error: {doc.error}</p>
-      )}
+      <StatusBadge status={doc.status} />
+      <button
+        onClick={() => onDelete(doc.id)}
+        className="shrink-0 rounded-md p-1 opacity-0 transition-all group-hover:opacity-60 hover:!opacity-100 hover:bg-red-500/10 text-slate-500 hover:text-red-400"
+        title={`Delete ${doc.filename}`}
+        aria-label={`Delete ${doc.filename}`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      </button>
+      {doc.error && <p className="text-[10px] text-red-400">Error: {doc.error}</p>}
     </motion.div>
   );
 }
 
-// ─── Main Documents Module ──────────────────────────────────────────
+/* ─── Main ──────────────────────────────────────────────────────────── */
 
 export default function DocumentsModule() {
   const { capabilities, pendingUploads, setPendingUploads } = useApp();
@@ -204,7 +156,6 @@ export default function DocumentsModule() {
   const [activeFile, setActiveFile] = useState<string>("");
   const documentsUnavailable = Boolean(capabilities && !capabilities.modules.documents);
 
-  // Load documents
   useEffect(() => {
     const load = async () => {
       try {
@@ -215,13 +166,9 @@ export default function DocumentsModule() {
           const docNames = new Set(docs.map((d) => d.filename));
           return prev.filter((name) => !docNames.has(name));
         });
-      } catch {
-        // Keep previous data on transient network/API issues.
-      }
+      } catch { /* keep existing */ }
     };
     load();
-
-    // Poll for status updates
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   }, [setPendingUploads]);
@@ -229,17 +176,13 @@ export default function DocumentsModule() {
   const handleUpload = useCallback(async (files: File[]) => {
     setUploading(true);
     setPendingUploads((prev) => [...prev, ...files.map((f) => f.name)]);
-
     for (const file of files) {
       setActiveFile(file.name);
       try {
         const doc = await uploadDocument(file);
         setDocuments((prev) => [...prev, doc]);
-      } catch (err) {
-        console.error("Upload failed:", err);
-      } finally {
-        setPendingUploads((prev) => prev.filter((name) => name !== file.name));
-      }
+      } catch (err) { console.error("Upload failed:", err); }
+      finally { setPendingUploads((prev) => prev.filter((n) => n !== file.name)); }
     }
     setActiveFile("");
     setUploading(false);
@@ -258,103 +201,109 @@ export default function DocumentsModule() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="min-h-full w-full px-4 py-7 sm:px-6 lg:px-8 flex flex-col items-center">
-        <div className="w-full max-w-5xl space-y-12">
-        {documentsUnavailable && (
-          <div className="glass rounded-xl p-3 border border-yellow-500/20 text-xs text-yellow-200 max-w-4xl mx-auto w-full">
-            Documents API is temporarily unreachable. Auto-retrying in background.
-          </div>
-        )}
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto w-full" style={{ padding: "28px 40px" }}>
+        <div className="w-full">
 
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-4xl mx-auto"
-        >
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Document <span className="text-gradient">Ingestion</span>
-          </h1>
-          <p className="text-sm text-slate-400">
-            Upload and manage documents for the RAG knowledge base
-          </p>
-        </motion.div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto w-full">
-          {[
-            { label: "Total", value: stats.total, color: "text-white" },
-            { label: "Completed", value: stats.completed, color: "text-green-400" },
-            { label: "Processing", value: stats.processing, color: "text-yellow-400" },
-            { label: "Failed", value: stats.failed, color: "text-red-400" },
-          ].map((stat, idx) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="glass rounded-xl p-4 text-center"
+          {/* Warning */}
+          {documentsUnavailable && (
+            <div
+              className="flex items-center gap-2.5 rounded-lg text-[11px] text-yellow-200/80"
+              style={{ padding: "10px 14px", marginBottom: 16, background: "rgba(250,204,21,0.05)", border: "1px solid rgba(250,204,21,0.12)" }}
             >
-              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-              <p className="text-[10px] text-slate-500 mt-1">{stat.label}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Upload Zone */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="max-w-4xl mx-auto w-full"
-        >
-          <DropZone onUpload={handleUpload} />
-          {(uploading || pendingUploads.length > 0) && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 glass rounded-xl p-3.5">
-              <p className="text-xs text-indigo-300 mb-2">
-                Ingestion pipeline active {activeFile ? `- ${activeFile}` : ""}
-              </p>
-              <p className="text-[10px] text-slate-500 mb-2">
-                Queued means the file is still being uploaded to the backend. After upload completes, it appears below as Processing or Completed.
-              </p>
-              <div className="space-y-1.5">
-                {pendingUploads.slice(0, 4).map((name) => (
-                  <div key={name} className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span className="truncate max-w-[70%]">{name}</span>
-                    <span className="text-cyan-300">Queued</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </motion.div>
-
-        {/* Documents List */}
-        <div className="max-w-4xl mx-auto w-full pt-1">
-          <h3 className="text-sm text-slate-400 font-medium mb-4 text-center">
-            Uploaded Documents
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <AnimatePresence mode="popLayout">
-              {documents.map((doc) => (
-                <DocumentCard
-                  key={doc.id}
-                  doc={doc}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-          {documents.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-slate-600 text-sm">No documents uploaded yet</p>
-              <p className="text-slate-700 text-xs mt-1">
-                Upload files to build the knowledge base
-              </p>
+              <span>⚠️</span>
+              <span>Documents API is temporarily unreachable. Auto-retrying in background.</span>
             </div>
           )}
-        </div>
+
+          {/* Header */}
+          <div style={{ marginBottom: 20 }}>
+            <h1 className="text-[20px] font-bold text-white" style={{ marginBottom: 4 }}>Documents</h1>
+            <p className="text-[12px] text-slate-500">Upload and manage documents for the RAG knowledge base</p>
+          </div>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-3" style={{ marginBottom: 20 }}>
+            {([
+              { label: "Total", value: stats.total, color: "#fff" },
+              { label: "Completed", value: stats.completed, color: "#6ee7b7" },
+              { label: "Processing", value: stats.processing, color: "#fbbf24" },
+              { label: "Failed", value: stats.failed, color: "#fca5a5" },
+            ] as const).map((s) => (
+              <div
+                key={s.label}
+                className="rounded-lg text-center"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "14px 12px" }}
+              >
+                <p className="text-[20px] font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-[10px] text-slate-500" style={{ marginTop: 2 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Two-column: Upload + Documents list */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+
+            {/* Left: Upload */}
+            <div>
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500" style={{ marginBottom: 10 }}>
+                Upload
+              </h2>
+              <DropZone onUpload={handleUpload} />
+
+              {/* Upload progress */}
+              {(uploading || pendingUploads.length > 0) && (
+                <div
+                  className="rounded-lg"
+                  style={{ marginTop: 10, padding: "10px 14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <p className="text-[11px] text-indigo-300" style={{ marginBottom: 6 }}>
+                    Ingestion pipeline active{activeFile ? ` — ${activeFile}` : ""}
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {pendingUploads.slice(0, 4).map((name) => (
+                      <div key={name} className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="truncate" style={{ maxWidth: "70%" }}>{name}</span>
+                        <span className="text-cyan-300">Queued</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: Documents list */}
+            <div>
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500" style={{ marginBottom: 10 }}>
+                Uploaded Documents ({documents.length})
+              </h2>
+              <div
+                className="rounded-xl"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  minHeight: 200,
+                }}
+              >
+                {documents.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center" style={{ padding: "48px 20px" }}>
+                    <p className="text-[13px] text-slate-500">No documents uploaded yet</p>
+                    <p className="text-[11px] text-slate-600" style={{ marginTop: 4 }}>
+                      Upload files to build the knowledge base
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ padding: "4px" }}>
+                    <AnimatePresence mode="popLayout">
+                      {documents.map((doc) => (
+                        <DocumentRow key={doc.id} doc={doc} onDelete={handleDelete} />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

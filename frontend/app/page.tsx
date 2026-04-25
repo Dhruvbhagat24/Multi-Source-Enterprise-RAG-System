@@ -7,6 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import ChatModule from "@/components/ChatModule";
 import DocumentsModule from "@/components/DocumentsModule";
 import SettingsModule from "@/components/SettingsModule";
+import ProjectsModule from "@/components/ProjectsModule";
 import { useApp } from "@/lib/store";
 import { getBackendCapabilities } from "@/lib/api";
 
@@ -19,10 +20,11 @@ const Scene3D = dynamic(() => import("@/components/Scene3D"), {
 });
 
 // Module content map
-const moduleComponents = {
+const moduleComponents: Record<string, React.ComponentType> = {
   chat: ChatModule,
   documents: DocumentsModule,
   settings: SettingsModule,
+  projects: ProjectsModule,
 };
 
 // Animation variants for page transitions
@@ -33,13 +35,23 @@ const pageVariants = {
 };
 
 export default function Home() {
-  const { activeModule, setActiveModule, capabilities, setCapabilities } = useApp();
+  const { activeModule, setActiveModule, setCapabilities, sidebarOpen, toggleSidebar } = useApp();
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const [moduleAvailability, setModuleAvailability] = useState({
     chat: true,
     documents: true,
     settings: true,
+    projects: true,
   });
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -57,9 +69,12 @@ export default function Home() {
           chat: prev.chat || data.modules.chat,
           documents: prev.documents || data.modules.documents,
           settings: prev.settings || data.modules.settings,
+          projects: prev.projects,
         }));
 
-        if (!data.modules[activeModule]) {
+        // Only redirect for backend-defined modules — skip client-only ones (projects)
+        const backendModules = data.modules as Record<string, boolean>;
+        if (activeModule in backendModules && !backendModules[activeModule]) {
           if (data.modules.chat) setActiveModule("chat");
           else if (data.modules.documents) setActiveModule("documents");
           else if (data.modules.settings) setActiveModule("settings");
@@ -95,6 +110,7 @@ export default function Home() {
       chat: moduleAvailability.chat,
       documents: moduleAvailability.documents,
       settings: moduleAvailability.settings,
+      projects: moduleAvailability.projects,
     }),
     [moduleAvailability]
   );
@@ -103,49 +119,38 @@ export default function Home() {
     moduleComponents[activeModule] || (availableModules.chat ? ChatModule : DocumentsModule);
 
   return (
-    <main className="flex h-screen w-screen overflow-hidden relative app-shell">
+    <main className="relative h-dvh w-full overflow-hidden app-shell">
       {/* 3D Background */}
       <Scene3D />
       <div className="cursor-glow" />
 
       {/* App UI Layer */}
-      <div className="relative z-10 flex w-full h-full">
+      <div className="relative z-10 grid h-full w-full grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-[auto_1fr]">
+        {isMobile && sidebarOpen && (
+          <button
+            className="fixed inset-0 z-20 bg-slate-950/55 backdrop-blur-[1px] md:hidden"
+            onClick={toggleSidebar}
+            aria-label="Close sidebar"
+          />
+        )}
+
         {/* Sidebar */}
         <Sidebar availableModules={availableModules} />
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top bar */}
-          <header className="flex items-center justify-between px-6 py-3 border-b border-white/5 glass">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-white capitalize">
-                {activeModule === "chat" ? "💬 Chat" : activeModule === "documents" ? "📂 Documents" : "⚙️ Settings"}
-              </h2>
-              <div className="h-4 w-px bg-white/10" />
-              <span className="text-[11px] text-slate-500">
-                {activeModule === "chat"
-                  ? "Ask questions about your documents"
-                  : activeModule === "documents"
-                  ? "Upload & manage documents"
-                  : "Configure system settings"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] px-2 py-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 text-cyan-300 tracking-wide">
-                {capabilities ? "Backend mapped" : "Discovering backend"}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className={`w-2 h-2 rounded-full ${capabilities?.endpoints?.health ? "bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]" : "bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.5)]"}`}
-                />
-                <span className="text-[10px] text-slate-500">
-                  {capabilities?.endpoints?.health ? "System Online" : "Reconnecting"}
-                </span>
-              </div>
-            </div>
-          </header>
+        <div className="glass-strong flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10">
+          {/* Mobile sidebar toggle (no desktop top bar) */}
+          <button
+            onClick={toggleSidebar}
+            className="absolute top-4 left-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition-colors hover:bg-white/5 hover:text-white md:hidden"
+            aria-label="Open sidebar"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
 
           {/* Active Module */}
           <AnimatePresence mode="wait">
@@ -156,7 +161,7 @@ export default function Home() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="flex-1 flex flex-col overflow-hidden"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               <ActiveComponent />
             </motion.div>

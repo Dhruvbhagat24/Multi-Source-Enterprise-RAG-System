@@ -205,19 +205,19 @@ def create_ai_enhanced_summary(text: str, tables: List[str], images: List[str]) 
             for i, table in enumerate(tables):
                 prompt_text += f"Table {i+1}:\n{table}\n\n"
         
-                prompt_text += """
-                YOUR TASK:
-                Generate a comprehensive, searchable description that covers:
+            prompt_text += """
+            YOUR TASK:
+            Generate a comprehensive, searchable description that covers:
 
-                1. Key facts, numbers, and data points from text and tables
-                2. Main topics and concepts discussed  
-                3. Questions this content could answer
-                4. Visual content analysis (charts, diagrams, patterns in images)
-                5. Alternative search terms users might use
+            1. Key facts, numbers, and data points from text and tables
+            2. Main topics and concepts discussed  
+            3. Questions this content could answer
+            4. Visual content analysis (charts, diagrams, patterns in images)
+            5. Alternative search terms users might use
 
-                Make it detailed and searchable - prioritize findability over brevity.
+            Make it detailed and searchable - prioritize findability over brevity.
 
-                SEARCHABLE DESCRIPTION:"""
+            SEARCHABLE DESCRIPTION:"""
 
         # Build message content starting with text
         message_content = [{"type": "text", "text": prompt_text}]
@@ -234,8 +234,8 @@ def create_ai_enhanced_summary(text: str, tables: List[str], images: List[str]) 
         # response = llm.invoke([message])
         
         # return response.content
-        response_text = llm.invoke([message])
-        return response_text
+        response = llm.invoke([message])
+        return response.content if hasattr(response, 'content') else response
 
         
     except Exception as e:
@@ -437,20 +437,25 @@ def ingest_folder(folder_path: str, vector_store: VectorStoreManager, file_route
 def run_complete_ingestion_pipeline(
     file_path: str,
     vector_store: VectorStoreManager,
-    file_router: FileRouter
+    file_router: FileRouter,
+    original_filename: str = None
 ):
     print("🚀 Starting RAG Ingestion Pipeline")
     print("=" * 50)
 
     source_id = str(uuid.uuid4())
-    source_file = os.path.basename(file_path)
+    source_file = original_filename or os.path.basename(file_path)
 
     ingestor = file_router.route(file_path)
     source_type = ingestor.__class__.__name__.replace("Ingestor", "").lower()
 
     extracted = ingestor.ingest(file_path)
+    if not extracted:
+        raise ValueError(
+            f"No extractable content found in '{source_file}'. "
+            "The file may be empty, image-only, or unsupported by the current parser settings."
+        )
 
-    # ---- Sheets (row-based ingestion) ----
     if source_type == "sheet":
         documents = rows_to_documents(
             extracted,
@@ -458,15 +463,24 @@ def run_complete_ingestion_pipeline(
             source_file=source_file,
             source_type=source_type
         )
-
-    # ---- PDFs / DOCX (document-style ingestion) ----
     else:
         chunks = create_chunks_by_title(extracted)
+        if not chunks:
+            raise ValueError(
+                f"No chunks could be created from '{source_file}'. "
+                "Try a cleaner source file or adjust parser/chunking settings."
+            )
         documents = summarise_chunks(
             chunks,
             source_id=source_id,
             source_file=source_file,
             source_type=source_type
+        )
+
+    if not documents:
+        raise ValueError(
+            f"No documents were generated from '{source_file}'. "
+            "Ingestion aborted to prevent indexing empty content."
         )
 
     vector_store.add_documents(documents)

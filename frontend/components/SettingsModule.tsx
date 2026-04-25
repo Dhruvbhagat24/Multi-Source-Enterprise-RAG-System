@@ -1,370 +1,607 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import {
-  getSettings,
-  updateSettings,
-  getSystemHealth,
-  type Settings,
-  type SystemHealth,
-} from "@/lib/api";
-import { useApp } from "@/lib/store";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-// ─── Status Dot ─────────────────────────────────────────────────────
+/* ─── Types ─────────────────────────────────────────────────────────── */
 
-function StatusDot({ status }: { status: string }) {
-  const isConnected = status === "connected";
-  return (
-    <div className="flex items-center gap-2">
-      <motion.div
-        animate={isConnected ? { scale: [1, 1.2, 1] } : {}}
-        transition={{ duration: 2, repeat: Infinity }}
-        className={`w-2.5 h-2.5 rounded-full ${
-          isConnected ? "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]" : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]"
-        }`}
-      />
-      <span className={`text-xs ${isConnected ? "text-green-400" : "text-red-400"}`}>
-        {isConnected ? "Connected" : "Disconnected"}
-      </span>
-    </div>
-  );
-}
+type SettingsTab = "general" | "account";
 
-// ─── Select Input ───────────────────────────────────────────────────
+/* ─── Icons ─────────────────────────────────────────────────────────── */
 
-function SelectField({
-  label,
+const icons = {
+  user: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  shield: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
+  logout: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
+  trash: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  ),
+  copy: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  ),
+  check: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  dots: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </svg>
+  ),
+  monitor: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+  chevronDown: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  ),
+};
+
+/* ─── Custom Select ─────────────────────────────────────────────────── */
+
+function CustomSelect({
   value,
   options,
   onChange,
-  description,
+  placeholder,
 }: {
-  label: string;
   value: string;
-  options: string[];
+  options: { value: string; label: string }[];
   onChange: (val: string) => void;
-  description?: string;
+  placeholder?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
   return (
-    <div>
-      <label className="block text-sm text-white font-medium mb-1">{label}</label>
-      {description && (
-        <p className="text-[11px] text-slate-500 mb-2">{description}</p>
-      )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        title={label}
-        aria-label={label}
-        className="w-full bg-surface-secondary border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25 transition-all appearance-none cursor-pointer"
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between text-[13px] transition-all outline-none"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          borderRadius: 10,
+          padding: "10px 14px",
+          color: selected ? "#fff" : "rgba(255,255,255,0.4)",
+        }}
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt} className="bg-surface-secondary">
-            {opt}
-          </option>
-        ))}
-      </select>
+        <span>{selected?.label || placeholder || "Select…"}</span>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          {icons.chevronDown}
+        </motion.span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 right-0 z-50 rounded-xl"
+            style={{
+              top: "calc(100% + 4px)",
+              background: "rgba(18,18,32,0.98)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              backdropFilter: "blur(20px)",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              padding: 4,
+              maxHeight: 200,
+              overflowY: "auto",
+            }}
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center rounded-lg text-[13px] transition-colors hover:bg-white/5 ${
+                  value === opt.value ? "text-indigo-400 font-medium" : "text-slate-300"
+                }`}
+                style={{ padding: "8px 12px" }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// ─── Component Card ─────────────────────────────────────────────────
+/* ─── Tab Button ────────────────────────────────────────────────────── */
 
-function ComponentCard({
-  title,
+function TabButton({
+  active,
+  label,
   icon,
-  status,
-  provider,
-  model,
-  delay,
+  onClick,
 }: {
-  title: string;
-  icon: string;
-  status: string;
-  provider: string;
-  model: string;
-  delay: number;
+  active: boolean;
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      className="glass rounded-xl p-5"
+    <button
+      onClick={onClick}
+      className={`relative flex w-full items-center gap-2.5 rounded-lg text-[13px] font-medium transition-all ${
+        active ? "text-white" : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
+      }`}
+      style={{ padding: "9px 12px" }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">{icon}</span>
-          <h3 className="text-sm text-white font-medium">{title}</h3>
-        </div>
-        <StatusDot status={status} />
-      </div>
-      <div className="space-y-2">
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Provider</span>
-          <span className="text-slate-300 font-mono">{provider}</span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-slate-500">Model</span>
-          <span className="text-slate-300 font-mono text-right max-w-50 truncate">
-            {model}
-          </span>
-        </div>
-      </div>
-    </motion.div>
+      {active && (
+        <motion.div
+          layoutId="settings-tab-highlight"
+          className="absolute inset-0 rounded-lg"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+          transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+        />
+      )}
+      <span className="relative z-10" style={{ color: active ? "#818cf8" : undefined }}>
+        {icon}
+      </span>
+      <span className="relative z-10">{label}</span>
+    </button>
   );
 }
 
-// ─── Main Settings Module ───────────────────────────────────────────
+/* ─── Active Sessions Data ──────────────────────────────────────────── */
 
-// Default settings when API is unavailable
-const defaultSettings: Settings = {
-  llm: { provider: "ollama", model: "llama3" },
-  embeddings: { provider: "hf", model: "all-MiniLM-L6-v2" },
-  available_providers: { llm: ["ollama", "openai"], embeddings: ["hf", "openai"] },
-  available_models: {
-    ollama: ["llama3", "llama3:8b-instruct-q4_K_M", "mistral", "codellama", "gemma"],
-    openai: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
-    hf: ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "multi-qa-MiniLM-L6-cos-v1"],
+const activeSessions = [
+  {
+    id: "1",
+    device: "Chrome (Windows)",
+    location: "Ahmedabad, Gujarat, IN",
+    created: "Apr 9, 2026, 1:30 PM",
+    updated: "Apr 24, 2026, 2:22 PM",
+    isCurrent: true,
   },
-};
+  {
+    id: "2",
+    device: "Android (Android)",
+    location: "Ahmedabad, Gujarat, IN",
+    created: "Apr 13, 2026, 8:09 AM",
+    updated: "Apr 24, 2026, 9:07 AM",
+    isCurrent: false,
+  },
+];
 
-export default function SettingsModule() {
-  const { capabilities } = useApp();
-  const settingsUnavailable = Boolean(capabilities && !capabilities.modules.settings);
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [saving, setSaving] = useState(false);
+/* ─── General Tab ───────────────────────────────────────────────────── */
+
+function GeneralTab() {
+  const [fullName, setFullName] = useState("Dhruv Bhagat");
+  const [displayName, setDisplayName] = useState("Dhruv");
+  const [role, setRole] = useState("");
+  const [preferences, setPreferences] = useState("");
   const [saved, setSaved] = useState(false);
-  const [apiOnline, setApiOnline] = useState(false);
 
-  // Form state
-  const [llmProvider, setLlmProvider] = useState(defaultSettings.llm.provider);
-  const [llmModel, setLlmModel] = useState(defaultSettings.llm.model);
-  const [embProvider, setEmbProvider] = useState(defaultSettings.embeddings.provider);
-  const [embModel, setEmbModel] = useState(defaultSettings.embeddings.model);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [s, h] = await Promise.all([getSettings(), getSystemHealth()]);
-        setSettings(s);
-        setHealth(h);
-        setLlmProvider(s.llm.provider);
-        setLlmModel(s.llm.model);
-        setEmbProvider(s.embeddings.provider);
-        setEmbModel(s.embeddings.model);
-        setApiOnline(true);
-      } catch {
-        // API not available, use defaults
-        setApiOnline(false);
-      }
-    };
-    load();
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await updateSettings({
-        llm_provider: llmProvider,
-        llm_model: llmModel,
-        embeddings_provider: embProvider,
-        embeddings_model: embModel,
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-
-      // Refresh health
-      const h = await getSystemHealth();
-      setHealth(h);
-    } catch {
-      // Handle error
-    }
-    setSaving(false);
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
-  const llmModels = (settings.available_models && llmProvider && settings.available_models[llmProvider]) || [];
-  const embModels = (settings.available_models && embProvider && settings.available_models[embProvider]) || [];
-
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl px-5 py-10 sm:px-8 sm:py-12 space-y-10">
-        {settingsUnavailable && (
-          <div className="glass rounded-xl p-4 border border-yellow-500/20 text-xs text-yellow-200 w-full">
-            Settings API is temporarily unreachable. Showing last known/default values.
-          </div>
-        )}
-
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full"
+    <div>
+      {/* Profile Section */}
+      <div style={{ marginBottom: 32 }}>
+        <h2
+          className="text-[15px] font-semibold text-white"
+          style={{ marginBottom: 20 }}
         >
-          <h1 className="text-2xl font-bold text-white mb-1">
-            System <span className="text-gradient">Settings</span>
-          </h1>
-          <p className="text-sm text-slate-400">
-            Configure AI providers, models, and system parameters
-          </p>
-          <div className="mt-4">
-            <button
-              onClick={async () => {
-                try {
-                  const h = await getSystemHealth();
-                  setHealth(h);
-                } catch {
-                  // No-op: health polling is optional
-                }
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-cyan-400/20 text-cyan-300 hover:bg-cyan-400/10 transition-colors"
+          Profile
+        </h2>
+
+        {/* Name Row */}
+        <div className="grid grid-cols-2 gap-5" style={{ marginBottom: 20 }}>
+          <div>
+            <label
+              className="block text-[12px] font-medium text-slate-400"
+              style={{ marginBottom: 6 }}
             >
-              Refresh System Status
-            </button>
+              Full name
+            </label>
+            <div className="flex items-center gap-3">
+              {/* Avatar */}
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: "linear-gradient(135deg, #06b6d4, #6366f1)",
+                }}
+              >
+                <span className="text-[11px] font-bold text-white">DB</span>
+              </div>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="flex-1 text-[13px] text-white outline-none transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                }}
+                placeholder="Your full name"
+              />
+            </div>
           </div>
-        </motion.div>
+          <div>
+            <label
+              className="block text-[12px] font-medium text-slate-400"
+              style={{ marginBottom: 6 }}
+            >
+              What should the AI call you? *
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full text-[13px] text-white outline-none transition-all"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                borderRadius: 10,
+                padding: "10px 14px",
+              }}
+              placeholder="Display name"
+            />
+          </div>
+        </div>
 
-        {/* API Status Banner */}
-        {!apiOnline && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-xl p-5 border border-yellow-500/20 flex items-center gap-3 w-full"
+        {/* Role Selection */}
+        <div style={{ marginBottom: 20 }}>
+          <label
+            className="block text-[12px] font-medium text-slate-400"
+            style={{ marginBottom: 6 }}
           >
-            <span className="text-yellow-400">⚠️</span>
-            <p className="text-xs text-yellow-300">
-              Backend API is offline. Showing default configuration. Start the API server to manage live settings.
-            </p>
-          </motion.div>
-        )}
+            What best describes your work?
+          </label>
+          <CustomSelect
+            value={role}
+            options={[
+              { value: "engineer", label: "Software Engineer" },
+              { value: "data-scientist", label: "Data Scientist" },
+              { value: "researcher", label: "Researcher" },
+              { value: "analyst", label: "Data Analyst" },
+              { value: "product-manager", label: "Product Manager" },
+              { value: "designer", label: "Designer" },
+              { value: "student", label: "Student" },
+              { value: "other", label: "Other" },
+            ]}
+            onChange={setRole}
+            placeholder="Select your role"
+          />
+        </div>
 
-        {/* System Status */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full"
-        >
-          <h2 className="text-sm text-slate-400 font-medium mb-3">
-            System Status
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ComponentCard
-              title="Language Model"
-              icon="🧠"
-              status={health?.components?.llm?.status || "disconnected"}
-              provider={health?.components?.llm?.provider || "—"}
-              model={health?.components?.llm?.model || "—"}
-              delay={0}
-            />
-            <ComponentCard
-              title="Embeddings"
-              icon="🔮"
-              status={health?.components?.embeddings?.status || "disconnected"}
-              provider={health?.components?.embeddings?.provider || "—"}
-              model={health?.components?.embeddings?.model || "—"}
-              delay={0.05}
-            />
-            <ComponentCard
-              title="Vector Store"
-              icon="💾"
-              status={health?.components?.vector_store?.status || "disconnected"}
-              provider={health?.components?.vector_store?.type || "—"}
-              model="ChromaDB"
-              delay={0.1}
-            />
-          </div>
-        </motion.div>
+        {/* Preferences */}
+        <div style={{ marginBottom: 24 }}>
+          <label
+            className="block text-[12px] font-medium text-slate-400"
+            style={{ marginBottom: 4 }}
+          >
+            What personal preferences should the AI consider in responses?
+          </label>
+          <p
+            className="text-[11px] text-slate-500"
+            style={{ marginBottom: 8 }}
+          >
+            Your preferences will apply to all conversations.
+          </p>
+          <textarea
+            value={preferences}
+            onChange={(e) => setPreferences(e.target.value)}
+            rows={4}
+            className="w-full resize-none text-[13px] text-white outline-none transition-all"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 10,
+              padding: "12px 14px",
+            }}
+            placeholder="e.g. when learning new concepts, I find analogies particularly helpful"
+          />
+        </div>
 
-        {/* Configuration */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="glass rounded-2xl p-7 md:p-8 w-full"
-        >
-          <h2 className="text-sm text-white font-semibold mb-5 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-indigo-500/20 flex items-center justify-center text-sm">⚙️</span>
-            LLM Configuration
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectField
-              label="Provider"
-              value={llmProvider}
-              options={settings?.available_providers.llm || ["ollama", "openai"]}
-              onChange={(v) => {
-                setLlmProvider(v);
-                // Reset model when provider changes
-                const models = settings?.available_models[v] || [];
-                if (models.length > 0) setLlmModel(models[0]);
-              }}
-              description="Select the LLM provider for AI responses"
-            />
-            <SelectField
-              label="Model"
-              value={llmModel}
-              options={llmModels}
-              onChange={setLlmModel}
-              description="Choose the specific model to use"
-            />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass rounded-2xl p-7 md:p-8 w-full"
-        >
-          <h2 className="text-sm text-white font-semibold mb-5 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-purple-500/20 flex items-center justify-center text-sm">🔮</span>
-            Embeddings Configuration
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectField
-              label="Provider"
-              value={embProvider}
-              options={settings?.available_providers.embeddings || ["hf", "openai"]}
-              onChange={(v) => {
-                setEmbProvider(v);
-                const models = settings?.available_models[v] || [];
-                if (models.length > 0) setEmbModel(models[0]);
-              }}
-              description="Select the embeddings provider"
-            />
-            <SelectField
-              label="Model"
-              value={embModel}
-              options={embModels}
-              onChange={setEmbModel}
-              description="Choose the embeddings model"
-            />
-          </div>
-        </motion.div>
-
-        {/* Save Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
-          className="w-full flex justify-end pt-2"
-        >
+        {/* Save */}
+        <div className="flex justify-end" style={{ marginTop: 20 }}>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleSave}
-            disabled={saving}
-            className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
-              saved
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-linear-to-r from-indigo-600 to-purple-600 text-white shadow-glow hover:shadow-glow-lg"
-            } disabled:opacity-50`}
-            id="save-settings"
+            className="text-[12px] font-medium transition-all"
+            style={{
+              padding: "9px 24px",
+              borderRadius: 10,
+              background: saved
+                ? "rgba(52,211,153,0.12)"
+                : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: saved ? "#6ee7b7" : "#fff",
+              border: saved ? "1px solid rgba(52,211,153,0.2)" : "none",
+            }}
+            id="save-general-settings"
           >
-            {saving ? "Saving..." : saved ? "✓ Saved" : "Save Changes"}
+            {saved ? "✓ Saved" : "Save Changes"}
           </motion.button>
-        </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Account Tab ───────────────────────────────────────────────────── */
+
+function AccountTab() {
+  const [orgIdCopied, setOrgIdCopied] = useState(false);
+  const orgId = "0695d3f3-b627-42c8-b45c-a165d064d084";
+
+  const handleCopyOrgId = () => {
+    navigator.clipboard.writeText(orgId);
+    setOrgIdCopied(true);
+    setTimeout(() => setOrgIdCopied(false), 2000);
+  };
+
+  return (
+    <div>
+      <h2 className="text-[15px] font-semibold text-white" style={{ marginBottom: 20 }}>
+        Account
+      </h2>
+
+      {/* Log Out */}
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: 18 }}
+      >
+        <div>
+          <p className="text-[13px] text-indigo-400 font-medium">Log out of all devices</p>
+        </div>
+        <button
+          className="flex items-center gap-2 rounded-lg text-[12px] font-medium text-white transition-all hover:bg-white/5"
+          style={{
+            padding: "8px 18px",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 10,
+          }}
+        >
+          {icons.logout}
+          <span>Log out</span>
+        </button>
+      </div>
+
+      {/* Delete Account */}
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: 20 }}
+      >
+        <div>
+          <p className="text-[13px] text-red-400 font-medium">Delete your account</p>
+        </div>
+        <button
+          className="flex items-center gap-2 rounded-lg text-[12px] font-medium transition-all hover:opacity-90"
+          style={{
+            padding: "8px 18px",
+            background: "rgba(239,68,68,0.9)",
+            color: "#fff",
+            borderRadius: 10,
+          }}
+        >
+          {icons.trash}
+          <span>Delete account</span>
+        </button>
+      </div>
+
+      {/* Organization ID */}
+      <div
+        className="flex items-center justify-between"
+        style={{ marginBottom: 24 }}
+      >
+        <p className="text-[13px] text-indigo-400 font-medium">Organization ID</p>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[12px] font-mono text-slate-400"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 8,
+              padding: "6px 12px",
+            }}
+          >
+            {orgId}
+          </span>
+          <button
+            onClick={handleCopyOrgId}
+            className="rounded-lg p-2 text-slate-400 transition-all hover:bg-white/5 hover:text-white"
+            title="Copy Organization ID"
+          >
+            {orgIdCopied ? (
+              <span className="text-emerald-400">{icons.check}</span>
+            ) : (
+              icons.copy
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div
+        style={{
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          marginBottom: 24,
+        }}
+      />
+
+      {/* Active Sessions */}
+      <h3 className="text-[15px] font-semibold text-white" style={{ marginBottom: 18 }}>
+        Active sessions
+      </h3>
+
+      {/* Sessions Table */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          border: "1px solid rgba(255,255,255,0.07)",
+        }}
+      >
+        {/* Table Header */}
+        <div
+          className="grid text-[11px] font-semibold uppercase tracking-wider text-indigo-400"
+          style={{
+            gridTemplateColumns: "2fr 2fr 1.5fr 1.5fr 40px",
+            padding: "12px 18px",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(255,255,255,0.02)",
+          }}
+        >
+          <span>Device</span>
+          <span>Location</span>
+          <span>Created</span>
+          <span>Updated</span>
+          <span />
+        </div>
+
+        {/* Table Rows */}
+        {activeSessions.map((session) => (
+          <div
+            key={session.id}
+            className="grid items-center text-[12px] transition-colors hover:bg-white/[0.02]"
+            style={{
+              gridTemplateColumns: "2fr 2fr 1.5fr 1.5fr 40px",
+              padding: "14px 18px",
+              borderBottom: "1px solid rgba(255,255,255,0.04)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">{icons.monitor}</span>
+              <span className="text-indigo-400 font-medium">{session.device}</span>
+              {session.isCurrent && (
+                <span
+                  className="text-[9px] font-semibold uppercase rounded-full"
+                  style={{
+                    padding: "2px 8px",
+                    background: "rgba(52,211,153,0.10)",
+                    color: "#6ee7b7",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Current
+                </span>
+              )}
+            </div>
+            <span className="text-slate-400">{session.location}</span>
+            <span className="text-slate-400">{session.created}</span>
+            <span className="text-slate-400">{session.updated}</span>
+            <button className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300">
+              {icons.dots}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Settings Module ──────────────────────────────────────────── */
+
+export default function SettingsModule() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+
+  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: "general", label: "General", icon: icons.user },
+    { id: "account", label: "Account", icon: icons.shield },
+  ];
+
+  return (
+    <div className="flex h-full min-h-0 flex-1">
+      {/* Left Sidebar Tabs */}
+      <div
+        className="flex flex-col shrink-0"
+        style={{
+          width: 200,
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          padding: "28px 12px",
+        }}
+      >
+        {/* Settings Title */}
+        <h1
+          className="text-[20px] font-bold text-white"
+          style={{ padding: "0 12px", marginBottom: 20 }}
+        >
+          Settings
+        </h1>
+
+        {/* Tab Buttons */}
+        <nav className="flex flex-col gap-1">
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.id}
+              active={activeTab === tab.id}
+              label={tab.label}
+              icon={tab.icon}
+              onClick={() => setActiveTab(tab.id)}
+            />
+          ))}
+        </nav>
+      </div>
+
+      {/* Right Content Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: "28px 40px" }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{ maxWidth: 780 }}
+          >
+            {activeTab === "general" ? <GeneralTab /> : <AccountTab />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
