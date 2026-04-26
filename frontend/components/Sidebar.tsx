@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useApp, type ModuleType } from "@/lib/store";
+import { useApp, type ModuleType, type Project } from "@/lib/store";
 import { getChatSessions, deleteChatSession } from "@/lib/api";
 
 // ─── Icons ──────────────────────────────────────────────────────────
@@ -96,9 +96,12 @@ export default function Sidebar({
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [projectMenuId, setProjectMenuId] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   const {
     sidebarOpen,
@@ -111,6 +114,10 @@ export default function Sidebar({
     setCurrentSessionId,
     setMessages,
     setCurrentSources,
+    projects,
+    setProjects,
+    selectedProjectId,
+    setSelectedProjectId,
   } = useApp();
 
   useEffect(() => {
@@ -138,6 +145,17 @@ export default function Sidebar({
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchOpen(false);
         setSearchQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Close project menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) {
+        setProjectMenuId(null);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -351,7 +369,7 @@ export default function Sidebar({
         {/* Divider */}
         <div style={{ margin: '4px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
-        {/* Main nav: Chats, Projects, Documents */}
+        {/* Main nav: Chat, Documents */}
         <div style={{ padding: '4px 10px' }}>
           {visibleNavItems.map((item) => (
             <motion.button
@@ -379,25 +397,180 @@ export default function Sidebar({
               )}
             </motion.button>
           ))}
-
-          {/* Projects */}
-          <button
-            onClick={() => {
-              setActiveModule("projects");
-              closeOnMobile();
-            }}
-            className={`flex w-full items-center gap-3 rounded-lg text-[13px] transition-colors ${
-              activeModule === "projects"
-                ? "bg-white/8 font-medium text-white"
-                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-            } ${!showExpanded ? "justify-center" : ""}`}
-            style={{ padding: '8px 10px' }}
-            id="nav-projects"
-          >
-            <span className={activeModule === "projects" ? "text-indigo-400" : ""}>{icons.projects}</span>
-            {showExpanded && <span>Projects</span>}
-          </button>
         </div>
+
+        {/* Divider before projects */}
+        {showExpanded && <div style={{ margin: '4px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }} />}
+
+        {/* Projects section (ChatGPT style) */}
+        {showExpanded && (
+          <div style={{ padding: '4px 10px' }}>
+            {/* Projects header with chevron */}
+            <button
+              onClick={() => setProjectsExpanded(!projectsExpanded)}
+              className="flex w-full items-center gap-2 rounded-lg text-[12px] font-medium text-slate-500 transition-colors hover:text-slate-300"
+              style={{ padding: '6px 10px', marginBottom: 2 }}
+            >
+              <motion.svg
+                animate={{ rotate: projectsExpanded ? 0 : -90 }}
+                transition={{ duration: 0.2 }}
+                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </motion.svg>
+              <span>Projects</span>
+            </button>
+
+            <AnimatePresence>
+              {projectsExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {/* New project button */}
+                  <button
+                    onClick={() => {
+                      setActiveModule('projects');
+                      setSelectedProjectId(null);
+                      closeOnMobile();
+                      // Trigger create modal via a custom event
+                      window.dispatchEvent(new CustomEvent('open-create-project'));
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg text-[13px] text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
+                    style={{ padding: '7px 10px' }}
+                    id="sidebar-new-project"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                      <line x1="12" y1="11" x2="12" y2="17" />
+                      <line x1="9" y1="14" x2="15" y2="14" />
+                    </svg>
+                    <span>New project</span>
+                  </button>
+
+                  {/* Project list */}
+                  {projects.map((project) => (
+                    <div key={project.id} className="relative">
+                      <button
+                        onClick={() => {
+                          setSelectedProjectId(project.id);
+                          setActiveModule('projects');
+                          closeOnMobile();
+                        }}
+                        className={`group flex w-full items-center justify-between rounded-lg text-[13px] transition-all ${
+                          activeModule === 'projects' && selectedProjectId === project.id
+                            ? 'bg-white/8 text-white'
+                            : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'
+                        }`}
+                        style={{ padding: '7px 10px' }}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <span className="truncate">{project.name}</span>
+                        </div>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProjectMenuId(projectMenuId === project.id ? null : project.id);
+                          }}
+                          className="ml-1 shrink-0 rounded p-1 opacity-0 transition-all hover:bg-white/10 group-hover:opacity-60"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="5" r="1" />
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="12" cy="19" r="1" />
+                          </svg>
+                        </span>
+                      </button>
+
+                      {/* Project context menu */}
+                      <AnimatePresence>
+                        {projectMenuId === project.id && (
+                          <motion.div
+                            ref={projectMenuRef}
+                            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                            transition={{ duration: 0.12 }}
+                            className="absolute right-0 z-50 rounded-xl"
+                            style={{
+                              top: '100%',
+                              marginTop: 2,
+                              width: 180,
+                              background: 'rgba(18,18,32,0.98)',
+                              border: '1px solid rgba(255,255,255,0.10)',
+                              backdropFilter: 'blur(20px)',
+                              boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                              padding: 5,
+                            }}
+                          >
+                            <button
+                              onClick={() => {
+                                setSelectedProjectId(project.id);
+                                setActiveModule('projects');
+                                setProjectMenuId(null);
+                                closeOnMobile();
+                              }}
+                              className="flex w-full items-center gap-2.5 rounded-lg text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+                              style={{ padding: '7px 10px' }}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                              </svg>
+                              Open project
+                            </button>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '3px 0' }} />
+                            <button
+                              onClick={() => {
+                                setProjects((prev) => prev.filter((p) => p.id !== project.id));
+                                if (selectedProjectId === project.id) setSelectedProjectId(null);
+                                setProjectMenuId(null);
+                              }}
+                              className="flex w-full items-center gap-2.5 rounded-lg text-[12px] text-red-400 hover:bg-red-500/10 transition-colors"
+                              style={{ padding: '7px 10px' }}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              </svg>
+                              Delete
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* Collapsed sidebar: just show the projects icon */}
+        {!showExpanded && (
+          <div style={{ padding: '4px 10px' }}>
+            <button
+              onClick={() => {
+                setActiveModule('projects');
+                closeOnMobile();
+              }}
+              className={`flex w-full items-center justify-center gap-3 rounded-lg text-[13px] transition-colors ${
+                activeModule === 'projects'
+                  ? 'bg-white/8 font-medium text-white'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+              }`}
+              style={{ padding: '8px 10px' }}
+              id="nav-projects-collapsed"
+            >
+              <span className={activeModule === 'projects' ? 'text-indigo-400' : ''}>{icons.projects}</span>
+            </button>
+          </div>
+        )}
 
         {/* Spacer */}
         <div style={{ height: '12px' }} />

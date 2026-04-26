@@ -123,6 +123,9 @@ def is_broad_concept_question(message: str) -> bool:
         "define",
         "tell me about",
         "overview of",
+        "summarize",      # ← ADD
+        "summarise",      # ← ADD
+        "give me a summary",
     ]
     likely_broad = any(text.startswith(s) for s in starters)
     token_count = len([t for t in text.replace("?", " ").split() if t])
@@ -561,6 +564,7 @@ async def chat(request: ChatRequest):
                 return
 
             # 1) Retrieve relevant chunks
+            # 1) Retrieve relevant chunks
             vs = get_vector_store()
             broad_query = is_broad_concept_question(request.message)
             retrieve_k = max(RAG_TOP_K, 6) if broad_query else RAG_TOP_K
@@ -568,8 +572,6 @@ async def chat(request: ChatRequest):
             project_files = normalize_project_files(request.project_files)
 
             if project_files:
-                # Direct metadata scan — guarantees project files are always found
-                # regardless of MMR ranking. Avoids single-chunk files being buried.
                 db = vs.load_or_create()
                 all_results = db.get(include=["documents", "metadatas"])
                 from langchain_core.documents import Document as LCDocument
@@ -582,7 +584,6 @@ async def chat(request: ChatRequest):
                             chunks.append(LCDocument(page_content=doc, metadata=meta))
                             break
             else:
-                # Global query — use normal MMR search
                 retriever = vs.as_retriever(
                     search_type="mmr",
                     search_kwargs={
@@ -601,30 +602,12 @@ async def chat(request: ChatRequest):
 
             chunks = dedupe_chunks(chunks)
 
-            project_files = normalize_project_files(request.project_files)
-            
-            if project_files:
-                chunks = [c for c in chunks if chunk_matches_project_files(c, project_files)]
-
-                if not chunks:
-                    answer = build_no_project_content_response(project_files)
-                    empty_sources: List[dict] = []
-
-                    yield f"data: {json.dumps({'type': 'sources', 'data': empty_sources})}\n\n"
-                    for line in answer.split("\n"):
-                        token = line + "\n"
-                        yield f"data: {json.dumps({'type': 'token', 'data': token})}\n\n"
-                        await asyncio.sleep(0)
-
-                    chat_sessions[session_id].append({
-                        "role": "assistant",
-                        "content": answer,
-                        "sources": empty_sources,
-                    })
-                    save_chat_sessions_to_disk()
-
-                    yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
-                    return
+            if not chunks:
+                answer = build_no_project_content_response(project_files) if project_files else "I couldn't find relevant content to answer your question."
+                yield f"data: {json.dumps({'type': 'sources', 'data': []})}\n\n"
+                yield f"data: {json.dumps({'type': 'token', 'data': answer})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
+                return
 
             chunks = chunks[:retrieve_k]
 
@@ -696,7 +679,7 @@ Instructions:
             else:
                 full_response = ""
                 for token in llm.stream([HumanMessage(content=prompt)]):
-                    text = token.content  # extract string
+                    text = token.content if hasattr(token, 'content') else str(token)
                     full_response += text
                     yield f"data: {json.dumps({'type': 'token', 'data': text})}\n\n"
                     await asyncio.sleep(0)

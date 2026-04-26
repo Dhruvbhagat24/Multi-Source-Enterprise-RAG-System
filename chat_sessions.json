@@ -195,5 +195,101 @@
         }
       ]
     }
+  ],
+  "848a1304-36c3-4d0f-87e2-2671e6a555a9": [
+    {
+      "role": "user",
+      "content": "What are the key topics?"
+    },
+    {
+      "role": "assistant",
+      "content": "Sure, here's a summary of the key topics covered in the context:\n\n**Key Topics:**\n\n* Blockchain technology\n* Cryptography\n* Blockchains and their architecture\n* Smart contracts and their functionality\n* Applications",
+      "sources": [
+        {
+          "id": 1,
+          "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
+          "metadata": {
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "chunk_index": 1,
+            "total_chunks": 3,
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
+            "source_type": "pdf"
+          }
+        },
+        {
+          "id": 2,
+          "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
+          "metadata": {
+            "chunk_index": 2,
+            "total_chunks": 3,
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "source_type": "pdf"
+          }
+        },
+        {
+          "id": 3,
+          "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+          "metadata": {
+            "total_chunks": 3,
+            "source_type": "pdf",
+            "chunk_index": 3,
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf"
+          }
+        }
+      ]
+    }
+  ],
+  "4fa39cd4-52d5-4abe-8472-a9668da6be49": [
+    {
+      "role": "user",
+      "content": "Summarize the mktgym project"
+    }
+  ],
+  "0740075c-e669-4720-b2d8-72cabc3d613f": [
+    {
+      "role": "user",
+      "content": "Summarize the tfjfhv project"
+    },
+    {
+      "role": "assistant",
+      "content": "Sure, here's a summary of the tfjfhv project:\n\n**Key Topics:**\n\n* Blockchain technology\n* Cryptography\n* Smart contracts\n* Academic event management\n\n**Main Subjects and Concepts:**\n\n* Introduction to blockchain technology\n* Fundamentals of cryptography\n* Cryptographic hash functions\n* Blockchains and their architecture\n* Types of blockchains\n* Consensus mechanisms in blockchains\n* Smart contracts and their functionality\n* Applications of blockchain technology",
+      "sources": [
+        {
+          "id": 1,
+          "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
+          "metadata": {
+            "source_type": "pdf",
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
+            "chunk_index": 1,
+            "total_chunks": 3
+          }
+        },
+        {
+          "id": 2,
+          "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
+          "metadata": {
+            "total_chunks": 3,
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "source_type": "pdf",
+            "chunk_index": 2
+          }
+        },
+        {
+          "id": 3,
+          "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+          "metadata": {
+            "total_chunks": 3,
+            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "chunk_index": 3,
+            "source_type": "pdf",
+            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf"
+          }
+        }
+      ]
+    }
   ]
 }

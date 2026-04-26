@@ -2,19 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-/* ─── Types ─────────────────────────────────────────────────────────── */
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  lastActivity: string;
-  chatCount: number;
-  docCount: number;
-  instructions: string;
-  files: { name: string; size: string }[];
-}
+import { useApp, type Project } from "@/lib/store";
 
 /* ─── Create Project Modal ──────────────────────────────────────────── */
 
@@ -651,11 +639,19 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
 /* ─── Main ──────────────────────────────────────────────────────────── */
 
 export default function ProjectsModule() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { projects, setProjects, selectedProjectId, setSelectedProjectId } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"activity" | "name">("activity");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  // Listen for sidebar's "New project" button
+  useEffect(() => {
+    const handler = () => setShowCreateModal(true);
+    window.addEventListener('open-create-project', handler);
+    return () => window.removeEventListener('open-create-project', handler);
+  }, []);
+
+  const selectedProject = selectedProjectId ? projects.find((p) => p.id === selectedProjectId) ?? null : null;
 
   const handleCreateProject = (name: string, desc: string) => {
     const newProject: Project = {
@@ -670,32 +666,30 @@ export default function ProjectsModule() {
     };
     setProjects((prev) => [newProject, ...prev]);
     setShowCreateModal(false);
-    setSelectedProject(newProject);
+    setSelectedProjectId(newProject.id);
   };
 
   // Supports both direct updates and functional updates (for polling)
   const handleUpdateProject = (updated: Project | ((prev: Project) => Project)) => {
     if (typeof updated === "function") {
-      setSelectedProject((prev) => (prev ? updated(prev) : prev));
       setProjects((prev) =>
-        prev.map((p) => (p.id === selectedProject?.id ? updated(p) : p))
+        prev.map((p) => (p.id === selectedProjectId ? updated(p) : p))
       );
     } else {
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      setSelectedProject(updated);
     }
   };
 
   const handleDeleteProject = (id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
-    setSelectedProject(null);
+    setSelectedProjectId(null);
   };
 
   if (selectedProject) {
     return (
       <ProjectDetailView
         project={selectedProject}
-        onBack={() => setSelectedProject(null)}
+        onBack={() => setSelectedProjectId(null)}
         onUpdateProject={handleUpdateProject}
         onDeleteProject={handleDeleteProject}
       />
@@ -766,7 +760,7 @@ export default function ProjectsModule() {
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {sorted.map((project) => (
-                <motion.div key={project.id} whileHover={{ y: -2 }} onClick={() => setSelectedProject(project)}
+                <motion.div key={project.id} whileHover={{ y: -2 }} onClick={() => setSelectedProjectId(project.id)}
                   className="rounded-xl cursor-pointer transition-colors hover:bg-white/4"
                   style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)", padding: "18px 20px" }}>
                   <div className="flex items-start gap-3" style={{ marginBottom: 10 }}>
