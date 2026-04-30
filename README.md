@@ -79,28 +79,6 @@ npm install
 cd ..
 ```
 
-## Environment Variables
-
-Create a `.env` file in the project root (same folder as `api_server.py`).
-
-### Core
-
-```env
-LLM_PRIMARY_PROVIDER=ollama
-LLM_PRIMARY_MODEL=gemma:2b
-EMBEDDINGS_DEFAULT_PROVIDER=hf
-EMBEDDINGS_DEFAULT_MODEL=all-MiniLM-L6-v2
-```
-
-### Ollama
-
-```env
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_NUM_CTX=2048
-OLLAMA_NUM_PREDICT=256
-OLLAMA_KEEP_ALIVE=10m
-```
-
 ### RAG Tuning
 
 ```env
