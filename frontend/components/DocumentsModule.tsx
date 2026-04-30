@@ -150,16 +150,17 @@ function DocumentRow({ doc, onDelete }: { doc: DocumentItem; onDelete: (id: stri
 /* ─── Main ──────────────────────────────────────────────────────────── */
 
 export default function DocumentsModule() {
-  const { capabilities, pendingUploads, setPendingUploads } = useApp();
+  const { capabilities, pendingUploads, setPendingUploads, userId } = useApp();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [activeFile, setActiveFile] = useState<string>("");
   const documentsUnavailable = Boolean(capabilities && !capabilities.modules.documents);
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
       try {
-        const docs = await getDocuments();
+        const docs = await getDocuments(userId);
         setDocuments(docs);
         setPendingUploads((prev) => {
           if (prev.length === 0) return prev;
@@ -171,27 +172,29 @@ export default function DocumentsModule() {
     load();
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [setPendingUploads]);
+  }, [setPendingUploads, userId]);
 
   const handleUpload = useCallback(async (files: File[]) => {
+    if (!userId) return;
     setUploading(true);
     setPendingUploads((prev) => [...prev, ...files.map((f) => f.name)]);
     for (const file of files) {
       setActiveFile(file.name);
       try {
-        const doc = await uploadDocument(file);
+        const doc = await uploadDocument(file, userId);
         setDocuments((prev) => [...prev, doc]);
       } catch (err) { console.error("Upload failed:", err); }
       finally { setPendingUploads((prev) => prev.filter((n) => n !== file.name)); }
     }
     setActiveFile("");
     setUploading(false);
-  }, [setPendingUploads]);
+  }, [setPendingUploads, userId]);
 
   const handleDelete = useCallback(async (id: string) => {
-    await deleteDocument(id);
+    if (!userId) return;
+    await deleteDocument(id, userId);
     setDocuments((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+  }, [userId]);
 
   const stats = {
     total: documents.length,

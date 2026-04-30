@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AppProvider } from "@/lib/store";
+import NextAuthProvider from "./providers/NextAuthProvider";
 
 export const metadata: Metadata = {
-  title: "RAG System — Enterprise AI Assistant",
+  title: "eNeural Console — Enterprise AI Assistant",
   description:
     "A production-grade RAG (Retrieval-Augmented Generation) system with immersive 3D visualization, multi-source document ingestion, and intelligent AI responses.",
   keywords: [
@@ -23,8 +23,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        <AppProvider>{children}</AppProvider>
+      <body className="antialiased bg-[#0d1117] text-white">
+        <NextAuthProvider>{children}</NextAuthProvider>
       </body>
     </html>
   );

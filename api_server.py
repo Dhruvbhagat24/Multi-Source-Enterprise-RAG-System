@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI server wrapping the existing RAG system.
 Provides endpoints for chat, document management, and settings.
 """
@@ -9,11 +9,12 @@ import asyncio
 import shutil
 import importlib
 import re as _re
+from difflib import SequenceMatcher
 
 from typing import Any, List, Optional
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -21,6 +22,9 @@ from langchain_core.messages import HumanMessage
 
 from dotenv import load_dotenv
 load_dotenv()
+
+import hashlib
+import secrets
 
 # ─── App Setup ───────────────────────────────────────────────────────
 app = FastAPI(title="RAG System API", version="1.0.0")
@@ -34,10 +38,14 @@ app.add_middleware(
 )
 
 # ─── In-memory stores (would be DB in production) ───────────────────
-chat_sessions = {}   # session_id -> list of messages
+chat_sessions = {}   # dict of user_id -> dict of session_id -> list of messages
 documents_store = [] # list of document metadata dicts
+projects_store = {}  # dict of user_id -> list of project payload dicts
+users_store = []     # list of user objects { id, email, password_hash, salt }
 
 SESSIONS_FILE = Path("./chat_sessions.json")
+PROJECTS_FILE = Path("./projects.json")
+USERS_FILE = Path("./users.json")
 
 UPLOAD_DIR = Path("./uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -49,6 +57,7 @@ def load_chat_sessions_from_disk():
     """Load chat history from disk if available."""
     global chat_sessions
     if not SESSIONS_FILE.exists():
+        chat_sessions = {}
         return
 
     try:
@@ -56,6 +65,8 @@ def load_chat_sessions_from_disk():
             data = json.load(f)
         if isinstance(data, dict):
             chat_sessions = data
+        else:
+            chat_sessions = {}
     except Exception:
         # Keep server running even if history file is malformed.
         chat_sessions = {}
@@ -71,7 +82,123 @@ def save_chat_sessions_to_disk():
         pass
 
 
+def load_projects_from_disk():
+    """Load project data from disk if available."""
+    global projects_store
+    if not PROJECTS_FILE.exists():
+        projects_store = {}
+        return
+
+    try:
+        with open(PROJECTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            projects_store = data
+        else:
+            projects_store = {}
+    except Exception:
+        # Keep server running even if file is malformed.
+        projects_store = {}
+
+
+def save_projects_to_disk():
+    """Persist projects so they survive backend restarts."""
+    try:
+        with open(PROJECTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(projects_store, f, ensure_ascii=False, indent=2)
+    except Exception:
+        # Persistence failures should not break API responses.
+        pass
+
+
 load_chat_sessions_from_disk()
+load_projects_from_disk()
+
+
+def get_psycopg_connection():
+    dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
+    if not dsn:
+        raise ValueError("Missing POSTGRES_DOCUMENTS_DSN")
+    if dsn.startswith("postgresql+"):
+        dsn = "postgresql://" + dsn.split("://", 1)[1]
+    psycopg = importlib.import_module("psycopg")
+    psycopg_rows = importlib.import_module("psycopg.rows")
+    return psycopg.connect(dsn, row_factory=getattr(psycopg_rows, "dict_row"))
+
+
+def init_postgres_tables():
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id UUID PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        salt VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            conn.commit()
+    except Exception as e:
+        print(f"Warning: Failed to init users table: {e}")
+
+
+init_postgres_tables()
+
+
+def hash_password(password: str, salt: str) -> str:
+    """Hash password with salt using PBKDF2."""
+    return hashlib.pbkdf2_hmac("sha512", password.encode(), salt.encode(), 100000).hex()
+
+
+def find_user_by_email(email: str) -> Optional[dict]:
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                row = cur.fetchone()
+                if row:
+                    # Format UUID object to string
+                    res = dict(row)
+                    res["id"] = str(res["id"])
+                    return res
+    except Exception as e:
+        print(f"Error finding user: {e}")
+    return None
+
+
+def create_user(email: str, password: str) -> dict:
+    if find_user_by_email(email):
+        raise ValueError("User already exists")
+    
+    salt = secrets.token_hex(16)
+    password_hash = hash_password(password, salt)
+    user_id = str(uuid.uuid4())
+    
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO users (id, email, password_hash, salt) VALUES (%s, %s, %s, %s)",
+                    (user_id, email, password_hash, salt)
+                )
+            conn.commit()
+    except Exception as e:
+        raise ValueError(f"Failed to create user: {e}")
+        
+    return {"id": user_id, "email": email}
+
+
+def validate_user(email: str, password: str) -> Optional[dict]:
+    user = find_user_by_email(email)
+    if not user:
+        return None
+    
+    password_hash = hash_password(password, user["salt"])
+    if password_hash == user["password_hash"]:
+        return {"id": user["id"], "email": user["email"]}
+    return None
 
 # ─── Lazy-loaded RAG components ─────────────────────────────────────
 _vector_store = None
@@ -161,6 +288,107 @@ def normalize_project_files(project_files: Optional[List[str]]) -> List[str]:
     return normalized
 
 
+def normalize_match_text(text: str) -> str:
+    """Normalize text for lightweight filename/query matching."""
+    if not text:
+        return ""
+
+    normalized = str(text).lower()
+    word_to_num = {
+        "zero": "0",
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
+        "ten": "10",
+        "eleven": "11",
+        "twelve": "12",
+    }
+
+    for word, num in word_to_num.items():
+        normalized = _re.sub(rf"\b{word}\b", num, normalized)
+
+    normalized = _re.sub(r"[^a-z0-9]+", " ", normalized)
+    return _re.sub(r"\s+", " ", normalized).strip()
+
+
+def tokenize_match_text(text: str) -> set[str]:
+    """Tokenize normalized text for overlap scoring."""
+    return {t for t in normalize_match_text(text).split() if len(t) >= 2}
+
+
+def infer_project_files_from_query(query: str, available_filenames: set[str]) -> List[str]:
+    """Infer likely target files from prompt text using filename overlap and fuzzy score."""
+    if not query or not available_filenames:
+        return []
+
+    query_norm = normalize_match_text(query)
+    query_tokens = tokenize_match_text(query)
+    if not query_norm:
+        return []
+
+    scored: list[tuple[float, str]] = []
+    for filename in available_filenames:
+        base = Path(filename).stem
+        base_norm = normalize_match_text(base)
+        if not base_norm:
+            continue
+
+        score = 0.0
+        if base_norm in query_norm:
+            score += 6.0
+
+        file_tokens = tokenize_match_text(base)
+        overlap = len(query_tokens & file_tokens)
+        if overlap:
+            score += float(overlap * 2)
+
+        ratio = SequenceMatcher(None, query_norm, base_norm).ratio()
+        if ratio >= 0.45:
+            score += ratio
+
+        if score > 0:
+            scored.append((score, filename))
+
+    if not scored:
+        return []
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_score = scored[0][0]
+
+    if best_score < 2.0:
+        return []
+
+    selected = [name for score, name in scored if score >= best_score - 0.8]
+    return selected[:3]
+
+
+def infer_project_files_from_session(session_id: str) -> List[str]:
+    """Fallback to recently used source files in the current chat session."""
+    messages = chat_sessions.get(session_id, [])
+    if not messages:
+        return []
+
+    collected: List[str] = []
+    for msg in reversed(messages):
+        if msg.get("role") != "assistant":
+            continue
+        for src in msg.get("sources") or []:
+            meta = src.get("metadata") or {}
+            source_file = Path(str(meta.get("source_file", ""))).name.strip().lower()
+            if source_file and source_file not in collected:
+                collected.append(source_file)
+        if collected:
+            break
+
+    return collected[:3]
+
+
 def chunk_matches_project_files(chunk: Any, project_files: List[str]) -> bool:
     """Check whether a retrieved chunk belongs to one of the project files."""
     if not project_files:
@@ -224,20 +452,16 @@ def get_documents_source_mode() -> str:
     return "memory"
 
 
-def fetch_documents_from_postgres() -> tuple[List[dict], Optional[str]]:
-    """Fetch documents metadata rows from Postgres using a configurable query."""
+def fetch_documents_from_postgres(user_id: str) -> tuple[List[dict], Optional[str]]:
+    """Fetch documents metadata rows from Postgres for a specific user."""
     dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
     if not dsn:
         return [], "Missing POSTGRES_DOCUMENTS_DSN or DATABASE_URL"
 
-    # Accept SQLAlchemy-style DSN values such as postgresql+asyncpg://...
     if dsn.startswith("postgresql+"):
         dsn = "postgresql://" + dsn.split("://", 1)[1]
 
-    query = os.getenv(
-        "POSTGRES_DOCUMENTS_QUERY",
-        "SELECT id, filename, size, status, type FROM documents ORDER BY id DESC LIMIT 200",
-    )
+    query = "SELECT id, file_name as filename, chunk_count as size, status, source_type as type FROM documents WHERE user_id = %s::uuid AND is_deleted = false ORDER BY id DESC LIMIT 200"
 
     try:
         psycopg = importlib.import_module("psycopg")
@@ -249,7 +473,7 @@ def fetch_documents_from_postgres() -> tuple[List[dict], Optional[str]]:
     try:
         with psycopg.connect(dsn) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(query)
+                cur.execute(query, (user_id,))
                 rows = cur.fetchall()
     except Exception as e:
         return [], str(e)
@@ -276,14 +500,79 @@ def fetch_documents_from_postgres() -> tuple[List[dict], Optional[str]]:
     return documents, None
 
 
-def get_documents_inventory() -> tuple[List[dict], str, Optional[str]]:
+def get_documents_inventory(user_id: str) -> tuple[List[dict], str, Optional[str]]:
     """Return documents and source mode; optionally returns retrieval error."""
     source_mode = get_documents_source_mode()
     if source_mode == "postgres":
-        docs, error = fetch_documents_from_postgres()
+        docs, error = fetch_documents_from_postgres(user_id)
         return docs, source_mode, error
 
+    # Note: documents_store is a fallback list, not yet keyed by user_id in this legacy branch.
     return documents_store, source_mode, None
+
+
+def get_active_documents_scope(user_id: str) -> Optional[tuple[set[str], set[str]]]:
+    """Return active (completed) document ids and filenames for retrieval filtering.
+
+    Returns None when metadata is unavailable so retrieval can gracefully fall back.
+    """
+    documents, _, error = get_documents_inventory(user_id)
+    if error:
+        return None
+
+    active_ids: set[str] = set()
+    active_filenames: set[str] = set()
+
+    for d in documents:
+        status = str(d.get("status", "")).strip().lower()
+        if status != "completed":
+            continue
+
+        doc_id = str(d.get("id", "")).strip().lower()
+        if doc_id:
+            active_ids.add(doc_id)
+
+        filename = Path(str(d.get("filename", ""))).name.strip().lower()
+        if filename:
+            active_filenames.add(filename)
+
+    return active_ids, active_filenames
+
+
+def chunk_matches_active_documents(
+    chunk: Any,
+    active_ids: set[str],
+    active_filenames: set[str],
+) -> bool:
+    """Check whether a retrieved chunk belongs to a currently active document."""
+    metadata = getattr(chunk, "metadata", {}) or {}
+    source_file = Path(str(metadata.get("source_file", ""))).name.strip().lower()
+    source_id = str(metadata.get("source_id", "")).strip().lower()
+
+    if source_id and source_id in active_ids:
+        return True
+    if source_file and source_file in active_filenames:
+        return True
+    return False
+
+
+def delete_vectors_for_document(doc_id: str, filename: Optional[str]) -> Optional[str]:
+    """Remove vector chunks that belong to a document id and/or filename."""
+    try:
+        vs = get_vector_store()
+        db = vs.load_or_create()
+
+        if doc_id:
+            db.delete(where={"source_id": doc_id})
+
+        if filename:
+            clean_name = Path(str(filename)).name.strip()
+            if clean_name:
+                db.delete(where={"source_file": clean_name})
+
+        return None
+    except Exception as e:
+        return str(e)
 
 
 def create_document_record(doc_meta: dict) -> Optional[str]:
@@ -308,8 +597,8 @@ def create_document_record(doc_meta: dict) -> Optional[str]:
         return "psycopg is not installed in this environment"
 
     query = """
-        INSERT INTO documents (id, project_id, file_name, source_type, status, chunk_count, is_deleted, created_at, updated_at)
-        VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, false, now(), now())
+        INSERT INTO documents (id, project_id, user_id, file_name, source_type, status, chunk_count, is_deleted, created_at, updated_at)
+        VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, false, now(), now())
     """
 
     try:
@@ -320,6 +609,7 @@ def create_document_record(doc_meta: dict) -> Optional[str]:
                     (
                         doc_meta.get("id"),
                         project_id,
+                        doc_meta.get("user_id"),
                         doc_meta.get("filename"),
                         source_type,
                         doc_meta.get("status", "processing"),
@@ -477,6 +767,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    user_id: str
     session_id: Optional[str] = None
     project_files: Optional[List[str]] = None
 
@@ -486,6 +777,21 @@ class SettingsUpdate(BaseModel):
     llm_model: Optional[str] = None
     embeddings_provider: Optional[str] = None
     embeddings_model: Optional[str] = None
+
+
+class ProjectsSyncRequest(BaseModel):
+    user_id: str
+    projects: List[dict]
+
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    id: str
+    email: str
 
 
 # ─── Health Check ────────────────────────────────────────────────────
@@ -523,6 +829,23 @@ async def health_check():
     }
 
 
+# ─── Auth Endpoints ──────────────────────────────────────────────────
+@app.post("/api/auth/register", response_model=AuthResponse)
+async def register_endpoint(request: AuthRequest):
+    try:
+        user = create_user(request.email, request.password)
+        return AuthResponse(**user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def login_endpoint(request: AuthRequest):
+    user = validate_user(request.email, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return AuthResponse(**user)
+
+
 # ─── Chat Endpoints ─────────────────────────────────────────────────
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
@@ -530,12 +853,16 @@ async def chat(request: ChatRequest):
     Chat endpoint with RAG retrieval.
     Returns a streaming response that sends tokens progressively.
     """
+    user_id = request.user_id
     session_id = request.session_id or str(uuid.uuid4())
 
-    if session_id not in chat_sessions:
-        chat_sessions[session_id] = []
+    if user_id not in chat_sessions:
+        chat_sessions[user_id] = {}
 
-    chat_sessions[session_id].append({
+    if session_id not in chat_sessions[user_id]:
+        chat_sessions[user_id][session_id] = []
+
+    chat_sessions[user_id][session_id].append({
         "role": "user",
         "content": request.message,
     })
@@ -553,7 +880,7 @@ async def chat(request: ChatRequest):
                     yield f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
                     await asyncio.sleep(0)
 
-                chat_sessions[session_id].append({
+                chat_sessions[user_id][session_id].append({
                     "role": "assistant",
                     "content": answer,
                     "sources": sources,
@@ -569,11 +896,35 @@ async def chat(request: ChatRequest):
             broad_query = is_broad_concept_question(request.message)
             retrieve_k = max(RAG_TOP_K, 6) if broad_query else RAG_TOP_K
 
+            active_scope = get_active_documents_scope(user_id)
+            active_filenames: set[str] = set()
+            if active_scope:
+                _, active_filenames = active_scope
+
             project_files = normalize_project_files(request.project_files)
+            auto_selected_files: List[str] = []
+            selection_mode: Optional[str] = None
+            if not project_files:
+                inferred_files = infer_project_files_from_query(request.message, active_filenames)
+                if inferred_files:
+                    project_files = inferred_files
+                    auto_selected_files = inferred_files
+                    selection_mode = "query"
+
+            if not project_files:
+                session_files = infer_project_files_from_session(session_id)
+                session_selected_files = [f for f in session_files if f in active_filenames]
+                if session_selected_files:
+                    project_files = session_selected_files
+                    auto_selected_files = session_selected_files
+                    selection_mode = "session"
+
+            if auto_selected_files:
+                yield f"data: {json.dumps({'type': 'selection', 'data': {'files': auto_selected_files, 'mode': selection_mode}})}\n\n"
 
             if project_files:
                 db = vs.load_or_create()
-                all_results = db.get(include=["documents", "metadatas"])
+                all_results = db.get(where={"user_id": user_id}, include=["documents", "metadatas"])
                 from langchain_core.documents import Document as LCDocument
                 chunks = []
                 for doc, meta in zip(all_results["documents"], all_results["metadatas"]):
@@ -590,6 +941,7 @@ async def chat(request: ChatRequest):
                         "k": retrieve_k,
                         "fetch_k": max(retrieve_k * 2, 12),
                         "lambda_mult": 0.45,
+                        "filter": {"user_id": user_id},
                     },
                 )
                 retrieval_queries = [request.message]
@@ -599,6 +951,14 @@ async def chat(request: ChatRequest):
                 chunks = []
                 for q in retrieval_queries:
                     chunks.extend(await asyncio.to_thread(retriever.invoke, q))
+
+            if active_scope:
+                active_ids, active_filenames = active_scope
+                chunks = [
+                    c
+                    for c in chunks
+                    if chunk_matches_active_documents(c, active_ids, active_filenames)
+                ]
 
             chunks = dedupe_chunks(chunks)
 
@@ -685,11 +1045,16 @@ Instructions:
                     await asyncio.sleep(0)
 
             # Save assistant message
-            chat_sessions[session_id].append({
+            assistant_record: dict[str, Any] = {
                 "role": "assistant",
                 "content": full_response,
                 "sources": sources,
-            })
+            }
+            if auto_selected_files:
+                assistant_record["resolved_project_files"] = auto_selected_files
+                assistant_record["resolved_project_mode"] = selection_mode
+
+            chat_sessions[user_id][session_id].append(assistant_record)
             save_chat_sessions_to_disk()
 
             yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
@@ -701,10 +1066,13 @@ Instructions:
 
 
 @app.get("/api/chat/sessions")
-async def list_sessions():
+async def list_sessions(user_id: Optional[str] = None):
     """List all chat sessions."""
+    if not user_id:
+        return {"sessions": []}
     sessions = []
-    for sid, messages in chat_sessions.items():
+    user_sessions = chat_sessions.get(user_id, {})
+    for sid, messages in user_sessions.items():
         first_msg = next((m for m in messages if m["role"] == "user"), None)
         sessions.append({
             "id": sid,
@@ -715,25 +1083,45 @@ async def list_sessions():
 
 
 @app.get("/api/chat/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, user_id: str):
     """Get messages for a specific session."""
-    if session_id not in chat_sessions:
+    user_sessions = chat_sessions.get(user_id, {})
+    if session_id not in user_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "messages": chat_sessions[session_id]}
+    return {"session_id": session_id, "messages": user_sessions[session_id]}
 
 
 @app.delete("/api/chat/sessions/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, user_id: str):
     """Delete a chat session."""
-    if session_id in chat_sessions:
-        del chat_sessions[session_id]
+    user_sessions = chat_sessions.get(user_id, {})
+    if session_id in user_sessions:
+        del user_sessions[session_id]
         save_chat_sessions_to_disk()
     return {"status": "deleted"}
 
 
+# ─── Projects Sync Endpoints ─────────────────────────────────────────
+@app.get("/api/projects")
+async def list_projects(user_id: Optional[str] = None):
+    """Return all synced projects."""
+    if not user_id:
+        return {"projects": []}
+    return {"projects": projects_store.get(user_id, [])}
+
+
+@app.put("/api/projects")
+async def sync_projects(payload: ProjectsSyncRequest):
+    """Replace synced projects snapshot from frontend."""
+    global projects_store
+    projects_store[payload.user_id] = payload.projects
+    save_projects_to_disk()
+    return {"status": "synced", "count": len(payload.projects)}
+
+
 # ─── Document Endpoints ─────────────────────────────────────────────
 @app.post("/api/documents/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(user_id: str = Form(...), file: UploadFile = File(...)):
     import traceback
     try:
         doc_id = str(uuid.uuid4())
@@ -758,6 +1146,7 @@ async def upload_document(file: UploadFile = File(...)):
             "size": len(content),
             "status": "processing",
             "type": file.content_type or "unknown",
+            "user_id": user_id,
         }
 
         print(f"📝 Creating document record...")  # ← ADD
@@ -773,7 +1162,15 @@ async def upload_document(file: UploadFile = File(...)):
                 from ingestion import run_complete_ingestion_pipeline
                 vs = get_vector_store()
                 fr = get_file_router()
-                await asyncio.to_thread(run_complete_ingestion_pipeline, str(file_path), vs, fr, original_filename)
+                await asyncio.to_thread(
+                    run_complete_ingestion_pipeline,
+                    str(file_path),
+                    vs,
+                    fr,
+                    original_filename,
+                    doc_id,
+                    user_id,
+                )
                 await asyncio.to_thread(vs.persist)
 
                 # ← Force reload so chat retriever picks up new documents
@@ -800,9 +1197,11 @@ async def upload_document(file: UploadFile = File(...)):
 
 
 @app.get("/api/documents")
-async def list_documents():
-    """List all uploaded documents with their status."""
-    documents, source_mode, error = get_documents_inventory()
+async def list_documents(user_id: Optional[str] = None):
+    """List all uploaded documents with their status for a specific user."""
+    if not user_id:
+        return {"documents": [], "source": "session"}
+    documents, source_mode, error = get_documents_inventory(user_id)
     response: dict[str, Any] = {"documents": documents, "source": source_mode}
     if error:
         response["error"] = error
@@ -810,7 +1209,7 @@ async def list_documents():
 
 
 @app.delete("/api/documents/{doc_id}")
-async def delete_document(doc_id: str):
+async def delete_document(doc_id: str, user_id: str):
     """Delete a document record."""
     source_mode = get_documents_source_mode()
     if source_mode == "postgres":
@@ -820,18 +1219,40 @@ async def delete_document(doc_id: str):
                 dsn = "postgresql://" + dsn.split("://", 1)[1]
             try:
                 psycopg = importlib.import_module("psycopg")
+                filename = None
                 with psycopg.connect(dsn) as conn:
                     with conn.cursor() as cur:
                         cur.execute(
-                            "UPDATE documents SET is_deleted = true, deleted_at = now(), updated_at = now() WHERE id = %s::uuid",
-                            (doc_id,),
+                            "SELECT file_name FROM documents WHERE id = %s::uuid AND user_id = %s::uuid",
+                            (doc_id, user_id),
+                        )
+                        row = cur.fetchone()
+                        if row and row[0]:
+                            filename = str(row[0])
+
+                        cur.execute(
+                            "UPDATE documents SET is_deleted = true, deleted_at = now(), updated_at = now() WHERE id = %s::uuid AND user_id = %s::uuid",
+                            (doc_id, user_id),
                         )
                     conn.commit()
+
+                delete_error = await asyncio.to_thread(delete_vectors_for_document, doc_id, filename)
+                if delete_error:
+                    raise HTTPException(status_code=500, detail=f"Metadata deleted but vector cleanup failed: {delete_error}")
             except Exception:
                 raise HTTPException(status_code=500, detail="Failed to delete document in postgres")
     else:
         global documents_store
+        filename = None
+        for d in documents_store:
+            if d.get("id") == doc_id:
+                filename = d.get("filename")
+                break
         documents_store = [d for d in documents_store if d["id"] != doc_id]
+
+        delete_error = await asyncio.to_thread(delete_vectors_for_document, doc_id, filename)
+        if delete_error:
+            raise HTTPException(status_code=500, detail=f"Metadata deleted but vector cleanup failed: {delete_error}")
     return {"status": "deleted"}
 
 
@@ -882,6 +1303,28 @@ async def update_settings(settings: SettingsUpdate):
         _vector_store = None
 
     return {"status": "updated", "message": "Settings updated. Changes take effect on next request."}
+
+
+# ─── Auth Endpoints ───────────────────────────────────────────────────
+@app.post("/auth/login")
+async def login(request: AuthRequest):
+    """Authenticate user with email and password."""
+    user = validate_user(request.email, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"user": user}
+
+
+@app.post("/auth/signup")
+async def signup(request: AuthRequest):
+    """Create a new user account."""
+    try:
+        user = create_user(request.email, request.password)
+        return {"user": user}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Signup failed")
 
 
 # ─── Run ─────────────────────────────────────────────────────────────

@@ -1,0 +1,123 @@
+{
+  "348b1d71-6cf0-4a76-a877-7fa7949c2787": [
+    {
+      "id": "1777393810703",
+      "name": "jgjfv",
+      "description": "",
+      "lastActivity": "4/28/2026",
+      "chatCount": 1,
+      "docCount": 1,
+      "instructions": "",
+      "files": [
+        {
+          "name": "Question-Bank-Week1_Week12.pdf",
+          "size": "471.2 KB",
+          "addedAt": "4/28/2026"
+        }
+      ],
+      "chats": [
+        {
+          "id": "1777396882590",
+          "title": "New Chat",
+          "messages": [],
+          "createdAt": "4/28/2026"
+        },
+        {
+          "id": "1777396088606",
+          "title": "kj",
+          "messages": [],
+          "createdAt": "4/28/2026"
+        },
+        {
+          "id": "1777395926286",
+          "title": "kj",
+          "messages": [],
+          "createdAt": "4/28/2026"
+        },
+        {
+          "id": "1777395549256",
+          "title": "hgkj",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What are the key topics?"
+            },
+            {
+              "role": "assistant",
+              "content": "**Key Topics:**\n\n1. **Blockchain Technology:** Definition, basic structure, and key characteristics (transparency, immutability, decentralization).\n\n\n2. **Public Key Cryptography:** Role of public key cryptography in blockchain systems, including digital signatures and signing and verification processes.\n\n\n3. **Merkle Tree Structure:** Description of the Merkle tree, its importance in maintaining data integrity, and how hash pointers contribute to this structure.\n\n\n4. **Cryptographic Concepts:** Explanation of cryptographic concepts such as hash functions, digital signatures, and public key encryption.\n\n\n5. **Bitcoin Transactions:** Working principles of Bitcoin transactions, including the role of public keys and the transaction process.",
+              "sources": [
+                {
+                  "id": 1,
+                  "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+                  "metadata": {
+                    "chunk_index": 1,
+                    "source_file": "Question-Bank-Week1_Week12.pdf",
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "source_type": "pdf",
+                    "total_chunks": 7
+                  }
+                },
+                {
+                  "id": 2,
+                  "content": "Week 2:\n\n1. Explain the role of public key cryptography in blockchain systems.\n\nWhat are digital signatures? Explain the signing and verification process.\n\n2.\n\n3. Describe the Merkle Tree structure and its importance in blockchain.\n\nExplain how hash pointers help maintain the int",
+                  "metadata": {
+                    "source_type": "pdf",
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "source_file": "Question-Bank-Week1_Week12.pdf",
+                    "total_chunks": 7,
+                    "chunk_index": 2
+                  }
+                },
+                {
+                  "id": 3,
+                  "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+                  "metadata": {
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "total_chunks": 7,
+                    "source_file": "Question-Bank-Week1_Week12.pdf",
+                    "chunk_index": 3,
+                    "source_type": "pdf"
+                  }
+                },
+                {
+                  "id": 4,
+                  "content": "Week 6:\n\n1. Discuss the use of blockchain in supply chain management.\n\n2. Explain how blockchain can improve healthcare data management.\n\n3. What is Decentralized Finance (DeFi)?\n\n4. Explain the role of blockchain in identity management systems.\n\n5. Discuss advantages and limitat",
+                  "metadata": {
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "source_type": "pdf",
+                    "chunk_index": 4,
+                    "total_chunks": 7,
+                    "source_file": "Question-Bank-Week1_Week12.pdf"
+                  }
+                },
+                {
+                  "id": 5,
+                  "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+                  "metadata": {
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "total_chunks": 7,
+                    "chunk_index": 5,
+                    "source_file": "Question-Bank-Week1_Week12.pdf",
+                    "source_type": "pdf"
+                  }
+                },
+                {
+                  "id": 6,
+                  "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+                  "metadata": {
+                    "source_file": "Question-Bank-Week1_Week12.pdf",
+                    "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+                    "total_chunks": 7,
+                    "source_type": "pdf",
+                    "chunk_index": 6
+                  }
+                }
+              ]
+            }
+          ],
+          "createdAt": "4/28/2026"
+        }
+      ]
+    }
+  ]
+}

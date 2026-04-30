@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useApp, type ModuleType, type Project } from "@/lib/store";
+import { useSession, signOut } from "next-auth/react";
+import { useApp, type ModuleType } from "@/lib/store";
 import { getChatSessions, deleteChatSession } from "@/lib/api";
 
 // ─── Icons ──────────────────────────────────────────────────────────
@@ -92,6 +93,16 @@ export default function Sidebar({
 }: {
   availableModules: Record<ModuleType, boolean>;
 }) {
+  const { data: session } = useSession();
+  const userEmail = session?.user?.email || "";
+  const userName = session?.user?.name || userEmail.split("@")[0] || "User";
+  const userInitials = userName
+    .split(/\s+/)
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U";
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -118,7 +129,12 @@ export default function Sidebar({
     setProjects,
     selectedProjectId,
     setSelectedProjectId,
+    userId,
   } = useApp();
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
@@ -172,14 +188,15 @@ export default function Sidebar({
   };
 
   useEffect(() => {
+    if (!userId) return;
     const loadSessions = async () => {
       try {
-        const data = await getChatSessions();
+        const data = await getChatSessions(userId);
         setSessions(data);
       } catch { /* keep existing */ }
     };
     loadSessions();
-  }, [setSessions]);
+  }, [setSessions, userId]);
 
   const handleNewChat = () => {
     setCurrentSessionId(null);
@@ -192,15 +209,17 @@ export default function Sidebar({
   const handleSelectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
     setActiveModule("chat");
+    if (!userId) return;
     const { getChatSession } = await import("@/lib/api");
-    const messages = await getChatSession(sessionId);
+    const messages = await getChatSession(sessionId, userId);
     setMessages(messages);
     closeOnMobile();
   };
 
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    await deleteChatSession(sessionId);
+    if (!userId) return;
+    await deleteChatSession(sessionId, userId);
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     if (currentSessionId === sessionId) {
       setCurrentSessionId(null);
@@ -452,7 +471,7 @@ export default function Sidebar({
                   </button>
 
                   {/* Project list */}
-                  {projects.map((project) => (
+                  {(isHydrated ? projects : []).map((project) => (
                     <div key={project.id} className="relative">
                       <button
                         onClick={() => {
@@ -643,7 +662,7 @@ export default function Sidebar({
                 >
                   {/* Email / identifier */}
                   <div style={{ padding: '8px 10px 6px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
-                    <p className="text-[11px] text-slate-400 truncate">dhruv@enterprise.ai</p>
+                    <p className="text-[11px] text-slate-400 truncate">{userEmail}</p>
                   </div>
 
                   {/* Menu items - Group 1 */}
@@ -680,6 +699,7 @@ export default function Sidebar({
                   </button>
 
                   <button
+                    onClick={() => signOut({ callbackUrl: "/login" })}
                     className="flex w-full items-center gap-3 rounded-lg text-[13px] text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
                     style={{ padding: '8px 10px' }}
                   >
@@ -697,11 +717,11 @@ export default function Sidebar({
               style={{ padding: '4px 2px' }}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-indigo-600">
-                <span className="text-[11px] font-bold text-white">DB</span>
+                <span className="text-[11px] font-bold text-white">{userInitials}</span>
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-[13px] font-medium text-white">Dhruv</p>
-                <p className="text-[10px] text-slate-500">Admin</p>
+                <p className="text-[13px] font-medium text-white truncate">{userName}</p>
+                <p className="text-[10px] text-slate-500 truncate">{userEmail}</p>
               </div>
               <motion.span
                 animate={{ rotate: profileMenuOpen ? 0 : 180 }}

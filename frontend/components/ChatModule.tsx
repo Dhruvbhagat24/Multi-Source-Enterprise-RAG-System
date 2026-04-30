@@ -116,15 +116,22 @@ function MessageBubble({
   content,
   sources,
   isStreaming,
+  resolvedProjectFiles,
+  resolvedProjectMode,
   highlightTerms,
 }: {
   role: string;
   content: string;
   sources?: Source[];
   isStreaming?: boolean;
+  resolvedProjectFiles?: string[];
+  resolvedProjectMode?: string;
   highlightTerms: string[];
 }) {
   const isUser = role === "user";
+  const hasSelection = !isUser && (resolvedProjectFiles?.length ?? 0) > 0;
+  const primarySelection = resolvedProjectFiles?.[0] ?? "";
+  const extraSelectionCount = Math.max((resolvedProjectFiles?.length ?? 0) - 1, 0);
 
   return (
     <motion.div
@@ -142,6 +149,16 @@ function MessageBubble({
       </div>
 
       <div className={`max-w-[min(760px,84%)] ${isUser ? "glass rounded-2xl rounded-tr-sm px-4 py-3" : "glass rounded-2xl rounded-tl-sm px-4 py-3"}`}>
+        {hasSelection && (
+          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/25 bg-cyan-500/12 px-2.5 py-1 text-[10px] text-cyan-100">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+            <span>
+              Auto-selected: {primarySelection}
+              {extraSelectionCount > 0 ? ` +${extraSelectionCount}` : ""}
+              {resolvedProjectMode ? ` (${resolvedProjectMode})` : ""}
+            </span>
+          </div>
+        )}
         <div className="markdown-content whitespace-pre-wrap text-sm leading-relaxed">
           {content}
           {isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 cursor-blink bg-indigo-400 align-text-bottom" />}
@@ -166,7 +183,7 @@ function WelcomeScreen() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mx-auto flex w-full max-w-3xl flex-col items-center justify-center px-4 sm:px-6"
+      className="mx-auto flex w-full max-w-3xl flex-col items-center justify-start px-4 pt-12 sm:px-6"
     >
       <motion.div
         animate={{ y: [0, -8, 0] }}
@@ -213,6 +230,7 @@ function useChatActions() {
     setAIState,
     setCurrentSources,
     setSessions,
+    userId,
   } = useApp();
 
   const handleSend = useCallback(
@@ -225,9 +243,12 @@ function useChatActions() {
       let assistantContent = "";
       setMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
 
+      if (!userId) return;
+
       await sendChatMessage(
         text,
         currentSessionId,
+        userId,
         null,
         (token) => {
           assistantContent += token;
@@ -262,7 +283,7 @@ function useChatActions() {
             return updated;
           });
 
-          import("@/lib/api").then(({ getChatSessions }) => getChatSessions().then(setSessions));
+          import("@/lib/api").then(({ getChatSessions }) => getChatSessions(userId).then(setSessions));
           setTimeout(() => setAIState("idle"), 3000);
         },
         (error) => {
@@ -277,10 +298,23 @@ function useChatActions() {
             };
             return updated;
           });
+        },
+        (files, mode) => {
+          if (!files || files.length === 0) return;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            updated[lastIdx] = {
+              ...updated[lastIdx],
+              resolved_project_files: files,
+              resolved_project_mode: mode,
+            };
+            return updated;
+          });
         }
       );
     },
-    [addMessage, currentSessionId, setAIState, setCurrentSessionId, setCurrentSources, setMessages, setSessions]
+    [addMessage, currentSessionId, setAIState, setCurrentSessionId, setCurrentSources, setMessages, setSessions, userId]
   );
 
   return { handleSend };
@@ -291,7 +325,7 @@ function ChatInput() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const { aiState, capabilities, setPendingUploads, setActiveModule } = useApp();
+  const { aiState, capabilities, setPendingUploads, setActiveModule, userId } = useApp();
   const { handleSend } = useChatActions();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -349,7 +383,7 @@ function ChatInput() {
   };
 
   const handleUploadFiles = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
+    if (files.length === 0 || !userId) return;
 
     setIsUploading(true);
     setUploadNotice(`Uploading ${files.length} file${files.length > 1 ? "s" : ""}...`);
@@ -360,7 +394,7 @@ function ChatInput() {
 
     for (const file of files) {
       try {
-        await uploadDocument(file);
+        await uploadDocument(file, userId);
         success += 1;
       } catch {
         failed += 1;
@@ -377,7 +411,7 @@ function ChatInput() {
     );
 
     setTimeout(() => setUploadNotice(""), 4000);
-  }, [setPendingUploads]);
+  }, [setPendingUploads, userId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -442,19 +476,7 @@ function ChatInput() {
           </motion.div>
         )}
 
-        <div className="relative glass-strong glow-border flex items-center rounded-[22px] border border-white/10 px-3 py-2 min-h-14 shadow-[0_18px_40px_rgba(4,8,20,0.45)]">
-          <button
-            ref={attachButtonRef}
-            type="button"
-            onClick={handleAttachClick}
-            disabled={isUploading || (capabilities ? !capabilities.modules.documents : false)}
-            className={`absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${menuOpen ? "bg-indigo-500/20 text-indigo-200" : "hover:bg-white/10 hover:text-white"}`}
-            title="Attach documents"
-            aria-label="Attach documents"
-          >
-            <span className="text-xl leading-none">+</span>
-          </button>
-
+        <div className="relative glass-strong glow-border flex items-center gap-2.5 rounded-2xl border border-white/10 px-3.5 py-1.5 min-h-11 shadow-[0_18px_40px_rgba(4,8,20,0.45)]">
           <AnimatePresence>
             {menuOpen && (
               <motion.div
@@ -551,28 +573,45 @@ function ChatInput() {
             )}
           </AnimatePresence>
 
-          <div className="flex flex-1 items-center">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isProcessing ? "AI is generating..." : "Ask about your documents..."}
-              disabled={isProcessing}
-              rows={1}
-              id="chat-input"
-              className="w-full resize-none bg-transparent pl-16 pr-12 py-3 text-base leading-7 text-white outline-none placeholder:leading-7 placeholder:text-slate-400"
-            />
-          </div>
+          <button
+            ref={attachButtonRef}
+            type="button"
+            onClick={handleAttachClick}
+            disabled={isUploading || (capabilities ? !capabilities.modules.documents : false)}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-40 ${menuOpen ? "bg-indigo-500/20 text-indigo-300" : "hover:bg-white/10 hover:text-white"}`}
+            title="Attach documents"
+            aria-label="Attach documents"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isProcessing ? "AI is generating..." : "Ask about your documents..."}
+            disabled={isProcessing}
+            rows={1}
+            id="chat-input"
+            className="flex-1 resize-none bg-transparent py-1 text-[14px] leading-6 text-white outline-none placeholder:text-slate-400"
+          />
 
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             type="submit"
             disabled={isProcessing || !input.trim()}
-            className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-linear-to-r from-indigo-600 to-purple-600 text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-all disabled:opacity-30"
+            style={{ background: input.trim() && !isProcessing ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(99,102,241,0.2)" }}
           >
-            ✈️
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 2L11 13" />
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+            </svg>
           </motion.button>
         </div>
       </form>
@@ -581,8 +620,17 @@ function ChatInput() {
 }
 
 export default function ChatModule() {
-  const { messages, aiState, capabilities } = useApp();
+  const {
+    messages,
+    aiState,
+    capabilities,
+    currentSessionId,
+    setMessages,
+    setCurrentSources,
+    userId,
+  } = useApp();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const didRestoreRef = useRef(false);
   const chatUnavailable = Boolean(capabilities && !capabilities.modules.chat);
 
   const latestUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content || "";
@@ -596,6 +644,29 @@ export default function ChatModule() {
       });
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (didRestoreRef.current) return;
+    if (!currentSessionId || messages.length > 0 || !userId) return;
+
+    didRestoreRef.current = true;
+
+    void import("@/lib/api")
+      .then(({ getChatSession }) => getChatSession(currentSessionId, userId))
+      .then((sessionMessages) => {
+        if (sessionMessages.length === 0) return;
+        setMessages(sessionMessages);
+
+        const lastAssistantWithSources = [...sessionMessages]
+          .reverse()
+          .find((m) => m.role === "assistant" && m.sources && m.sources.length > 0);
+
+        setCurrentSources(lastAssistantWithSources?.sources ?? []);
+      })
+      .catch(() => {
+        // Keep any locally restored chat if session fetch fails.
+      });
+  }, [currentSessionId, messages.length, setCurrentSources, setMessages, userId]);
 
   const hasMessages = messages.length > 0;
 
@@ -623,6 +694,8 @@ export default function ChatModule() {
                   content={msg.content}
                   sources={msg.sources}
                   isStreaming={msg.isStreaming}
+                  resolvedProjectFiles={msg.resolved_project_files}
+                  resolvedProjectMode={msg.resolved_project_mode}
                   highlightTerms={highlightTerms}
                 />
               ))}

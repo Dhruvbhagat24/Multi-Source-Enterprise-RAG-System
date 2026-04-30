@@ -1,295 +1,155 @@
 {
-  "59b49c35-a62b-49f1-9dbe-ee2750b5bec5": [
+  "5ef091b8-c512-4aca-b1e3-59a45f744b54": [
     {
       "role": "user",
-      "content": "What are the key topics?"
+      "content": "Summarize the key findings from uploaded documents"
     },
     {
       "role": "assistant",
-      "content": "I couldn't find any indexed content for 'hs_reportwriting.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "1f0ed62f-1741-46aa-828a-a4ef4c2c804c": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find any indexed content for '2025-26-nptel_occe3004-bct-practicallist.docx.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "06491ea1-6e7d-4fbe-8eec-60800bd7d24c": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    }
-  ],
-  "53879340-ae32-45c1-b64c-0cf5da80e591": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find any indexed content for 'hs_reportwriting.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "45763c84-1522-40cc-8d33-11c1156051bf": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find any indexed content for 'hs_reportwriting.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "40226b80-0fcc-4be1-a5a8-360edfdb729f": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    }
-  ],
-  "620d5d52-46e6-409e-aca0-8418e0a204ad": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find any indexed content for 'hs_reportwriting.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "955bf64b-47c1-4dd6-898a-9b404c719dc7": [
-    {
-      "role": "user",
-      "content": "report writing"
-    }
-  ],
-  "2955e7d6-0dce-4e95-943a-c4677afade45": [
-    {
-      "role": "user",
-      "content": "HS ReportWriting report writing skills"
-    }
-  ],
-  "dc0c6973-f8cb-4a5b-9d88-2d16eee589d7": [
-    {
-      "role": "user",
-      "content": "HS ReportWriting report writing skills"
-    }
-  ],
-  "74ea0f67-0f31-40a6-81f0-68897e1f6e1c": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find any indexed content for 'hs_reportwriting.pdf', so I can't answer this from the current project files.",
-      "sources": []
-    }
-  ],
-  "2f9e55f7-59ef-444e-ba99-e66e29ef0333": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "The key topics of the exhibition were not explicitly mentioned in the context, so I cannot answer this question from the provided context.",
+      "content": "**Key Findings:**\n\n**Source 1**\n\n* **Architecture of Hyperledger Fabric:** A distributed ledger platform built on blockchain technology. It consists of nodes (peer peers) that collaborate to maintain a shared and immutable record of transactions.\n* **Components of Hyperledger Fabric:**\n    * **Peer nodes:** Individual nodes participating in the network, responsible for validating transactions and maintaining the blockchain.\n    * **Ordering service:** A component that facilitates the ordering of transactions and ensures their execution in a consistent order.\n    * **Membership Service Provider (MSP):** An external entity that provides security and identity verification services to participants, ensuring trust and compliance.\n* **Channel:** A channel is a logical grouping of peers who share a common",
       "sources": [
         {
           "id": 1,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
+          "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
           "metadata": {
-            "source_id": "201c22ef-2983-4015-8f00-9089550b0af4",
-            "total_chunks": 1,
-            "source_file": "HS_ReportWriting.pdf",
-            "chunk_index": 1,
-            "source_type": "pdf"
+            "chunk_index": 5,
+            "source_file": "Question-Bank-Week1_Week12.pdf",
+            "source_type": "pdf",
+            "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
+            "total_chunks": 7
           }
         },
         {
           "id": 2,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
+          "content": "Dhruv Bhagat\n\nAI/ML Engineer & Cloud Developer | Software Development + Analytics +91 9998727137 | Vadodara | bhagatdhruv2005@gmail.com | LinkedIn | GitHub\n\nSUMMARY\n\nSoftware Engineer specializing in Backend Development, Cloud Systems, and Al-driven applications. Experienced in b",
           "metadata": {
             "chunk_index": 1,
-            "total_chunks": 1,
-            "source_id": "6aeea729-ecee-418a-a864-18ac8506eb9a",
-            "source_type": "pdf",
-            "source_file": "HS_ReportWriting.pdf"
-          }
-        },
-        {
-          "id": 3,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
-          "metadata": {
-            "total_chunks": 1,
-            "source_type": "pdf",
-            "source_file": "HS_ReportWriting.pdf",
-            "chunk_index": 1,
-            "source_id": "565f76a4-1bde-4079-9bc1-edfcf2d10e64"
-          }
-        },
-        {
-          "id": 4,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
-          "metadata": {
-            "chunk_index": 1,
-            "source_type": "pdf",
-            "source_file": "HS_ReportWriting.pdf",
-            "source_id": "28af6cd3-0327-43ba-a459-a2105e888820",
-            "total_chunks": 1
-          }
-        },
-        {
-          "id": 5,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
-          "metadata": {
-            "chunk_index": 1,
-            "total_chunks": 1,
-            "source_id": "bc30c957-d539-4878-a457-49d988293caf",
-            "source_type": "pdf",
-            "source_file": "HS_ReportWriting.pdf"
-          }
-        },
-        {
-          "id": 6,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
-          "metadata": {
-            "source_file": "HS_ReportWriting.pdf",
-            "total_chunks": 1,
-            "source_id": "e8346821-329b-4d8b-8972-6e27686f89a0",
-            "chunk_index": 1,
-            "source_type": "pdf"
-          }
-        }
-      ]
-    }
-  ],
-  "dbace32e-5073-40f8-9de5-79c2fcaa2c28": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "Sure, here's a summary of the key topics covered in the context:\n\n**Key Topics:**\n\n* Promoting the skills and craftsmanship of Indian artisans and entrepreneurs\n* Providing a platform for them to showcase their creativity\n* Connecting them with a wider audience",
-      "sources": [
-        {
-          "id": 1,
-          "content": "Report on Exhibition-cum-Sale Organized by Skill India\n\nBy Dhruv Bhagat\n\nThe Exhibition-cum-Sale organized by Skill India, Government of India, was held at Pragati Maidan, New Delhi, from 10th to 15th October 2025. The event aimed to promote the skills and craftsmanship of Indian",
-          "metadata": {
-            "source_type": "pdf",
-            "chunk_index": 1,
-            "total_chunks": 1,
-            "source_id": "fde51f76-e98f-423c-91f6-e2108ffed27b",
-            "source_file": "HS_ReportWriting.pdf"
-          }
-        }
-      ]
-    }
-  ],
-  "848a1304-36c3-4d0f-87e2-2671e6a555a9": [
-    {
-      "role": "user",
-      "content": "What are the key topics?"
-    },
-    {
-      "role": "assistant",
-      "content": "Sure, here's a summary of the key topics covered in the context:\n\n**Key Topics:**\n\n* Blockchain technology\n* Cryptography\n* Blockchains and their architecture\n* Smart contracts and their functionality\n* Applications",
-      "sources": [
-        {
-          "id": 1,
-          "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
-          "metadata": {
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
-            "chunk_index": 1,
+            "source_file": "ResumeAIMLwithcloud.pdf",
             "total_chunks": 3,
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
-            "source_type": "pdf"
-          }
-        },
-        {
-          "id": 2,
-          "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
-          "metadata": {
-            "chunk_index": 2,
-            "total_chunks": 3,
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "source_id": "57076137-981d-498b-9f9b-d01f88814a0e",
             "source_type": "pdf"
           }
         },
         {
           "id": 3,
-          "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+          "content": "Chandubhai S. Patel Institute of Technology (CSPIT), Charusat University Bachelors\n\nin Technology — Computer Science and Engineering (CSE)\n\nCGPA — 8.67\n\nBright School - GSEB\n\nResult 77%\n\nPROJECTS\n\n¢\n\nEnd to End E-Commerce Churn Intelligence System GitHub\\ Live Built a production-",
           "metadata": {
+            "source_file": "ResumeAIML.pdf",
+            "source_type": "pdf",
+            "source_id": "fe89608c-5ef3-4cbd-a621-373beadfc952",
             "total_chunks": 3,
-            "source_type": "pdf",
-            "chunk_index": 3,
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf"
-          }
-        }
-      ]
-    }
-  ],
-  "4fa39cd4-52d5-4abe-8472-a9668da6be49": [
-    {
-      "role": "user",
-      "content": "Summarize the mktgym project"
-    }
-  ],
-  "0740075c-e669-4720-b2d8-72cabc3d613f": [
-    {
-      "role": "user",
-      "content": "Summarize the tfjfhv project"
-    },
-    {
-      "role": "assistant",
-      "content": "Sure, here's a summary of the tfjfhv project:\n\n**Key Topics:**\n\n* Blockchain technology\n* Cryptography\n* Smart contracts\n* Academic event management\n\n**Main Subjects and Concepts:**\n\n* Introduction to blockchain technology\n* Fundamentals of cryptography\n* Cryptographic hash functions\n* Blockchains and their architecture\n* Types of blockchains\n* Consensus mechanisms in blockchains\n* Smart contracts and their functionality\n* Applications of blockchain technology",
-      "sources": [
-        {
-          "id": 1,
-          "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
-          "metadata": {
-            "source_type": "pdf",
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
-            "chunk_index": 1,
-            "total_chunks": 3
-          }
-        },
-        {
-          "id": 2,
-          "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
-          "metadata": {
-            "total_chunks": 3,
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf",
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
-            "source_type": "pdf",
             "chunk_index": 2
           }
         },
         {
-          "id": 3,
-          "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+          "id": 4,
+          "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
           "metadata": {
-            "total_chunks": 3,
-            "source_id": "31ad2958-392c-4777-aab8-52991585e679",
+            "total_chunks": 7,
+            "source_file": "Question-Bank-Week1_Week12.pdf",
+            "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
             "chunk_index": 3,
+            "source_type": "pdf"
+          }
+        },
+        {
+          "id": 5,
+          "content": "Week 2:\n\n1. Explain the role of public key cryptography in blockchain systems.\n\nWhat are digital signatures? Explain the signing and verification process.\n\n2.\n\n3. Describe the Merkle Tree structure and its importance in blockchain.\n\nExplain how hash pointers help maintain the int",
+          "metadata": {
+            "total_chunks": 7,
+            "chunk_index": 2,
+            "source_id": "0b7c529d-62c4-4dbe-b1c2-3b0db94a30a8",
             "source_type": "pdf",
-            "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx (1).pdf"
+            "source_file": "Question-Bank-Week1_Week12.pdf"
           }
         }
       ]
     }
-  ]
+  ],
+  "348b1d71-6cf0-4a76-a877-7fa7949c2787": {
+    "0f5e6e11-4b07-41c9-bd28-9a398364ea1e": [
+      {
+        "role": "user",
+        "content": "What are the main topics covered?"
+      },
+      {
+        "role": "assistant",
+        "content": "**Main Topics Covered:**\n\n* **Consensus Mechanisms in Blockchain:**\n    * Definition of a consensus mechanism\n    * Different consensus algorithms:\n        * Proof of Work (PoW)\n        * Proof of Stake (PoS)\n\n\n* **Byzantine Generals Problem:**\n    * Definition of the problem\n    * Relevance to distributed systems\n\n\n* **Practical Byzantine Fault Tolerance (PBFT):**\n    * Definition of PBFT\n    * How PBFT works\n\n\n* **Smart Contracts:**\n    * Definition of a smart contract\n    * How smart contracts work with an example\n\n\n* **Ethereum Blockchain Architecture:**\n    * Components of the Ethereum blockchain\n    * How the blockchain is secured",
+        "sources": [
+          {
+            "id": 1,
+            "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+            "metadata": {
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "total_chunks": 7,
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787",
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f",
+              "chunk_index": 3,
+              "source_type": "pdf"
+            }
+          },
+          {
+            "id": 2,
+            "content": "Week 12:\n\n1. Discuss blockchain applications in:\n\ne Supply chain\n\ne Healthcare\n\ne Finance\n\n2. What is Decentralized Finance (DeFi)? Explain its components.\n\n3. Explain the concept of Non-Fungible Tokens (NFTs).\n\n4. What are the challenges in adopting blockchain in real-world syst",
+            "metadata": {
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787",
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "chunk_index": 7,
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f"
+            }
+          },
+          {
+            "id": 3,
+            "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+            "metadata": {
+              "chunk_index": 6,
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787",
+              "total_chunks": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f"
+            }
+          },
+          {
+            "id": 4,
+            "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+            "metadata": {
+              "chunk_index": 5,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f",
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787",
+              "source_type": "pdf",
+              "total_chunks": 7
+            }
+          },
+          {
+            "id": 5,
+            "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+            "metadata": {
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f",
+              "chunk_index": 1,
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787"
+            }
+          },
+          {
+            "id": 6,
+            "content": "Week 6:\n\n1. Discuss the use of blockchain in supply chain management.\n\n2. Explain how blockchain can improve healthcare data management.\n\n3. What is Decentralized Finance (DeFi)?\n\n4. Explain the role of blockchain in identity management systems.\n\n5. Discuss advantages and limitat",
+            "metadata": {
+              "total_chunks": 7,
+              "chunk_index": 4,
+              "user_id": "348b1d71-6cf0-4a76-a877-7fa7949c2787",
+              "source_id": "53b67494-29d2-47b5-a22e-c892929aa65f",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf"
+            }
+          }
+        ]
+      }
+    ]
+  }
 }

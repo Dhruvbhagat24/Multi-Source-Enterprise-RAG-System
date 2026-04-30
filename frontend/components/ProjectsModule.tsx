@@ -127,6 +127,7 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
   onUpdateProject: (updated: Project | ((prev: Project) => Project)) => void;
   onDeleteProject: (id: string) => void;
 }) {
+  const { userId } = useApp();
   const [chatInput, setChatInput] = useState("");
   const [showInstructionsInput, setShowInstructionsInput] = useState(false);
   const [instructions, setInstructions] = useState(project.instructions);
@@ -203,11 +204,18 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
     const { sendChatMessage } = await import("@/lib/api");
     let assistantContent = "";
 
+    if (!userId) {
+      setIsThinking(false);
+      setMessages(prev => [...prev, { role: "assistant", content: "❌ Error: User not authenticated." }]);
+      return;
+    }
+
     await sendChatMessage(
       msgText,
       null,
+      userId,
       project.files.map((file) => file.name).filter((name) => !processingFiles.has(name)),
-      (token) => {
+      (token: string) => {
         assistantContent += token;
         setIsThinking(false);
         setIsStreaming(true);
@@ -266,14 +274,15 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
 
     for (const file of files) {
       try {
-        const doc = await uploadDocument(file);
+        if (!userId) return;
+        const doc = await uploadDocument(file, userId);
 
         // Poll until completed or failed (max ~3 min, 3s interval)
         let attempts = 0;
         while (attempts < 60) {
           await new Promise((r) => setTimeout(r, 3000));
           try {
-            const docs = await getDocuments();
+            const docs = await getDocuments(userId);
             const found = docs.find((d) => d.id === doc.id);
             if (found?.status === "completed" || found?.status === "failed") break;
           } catch { /* continue polling */ }
@@ -639,7 +648,7 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
 /* ─── Main ──────────────────────────────────────────────────────────── */
 
 export default function ProjectsModule() {
-  const { projects, setProjects, selectedProjectId, setSelectedProjectId } = useApp();
+  const { projects, setProjects, selectedProjectId, setSelectedProjectId, userId } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"activity" | "name">("activity");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -663,6 +672,7 @@ export default function ProjectsModule() {
       docCount: 0,
       instructions: "",
       files: [],
+      chats: []
     };
     setProjects((prev) => [newProject, ...prev]);
     setShowCreateModal(false);

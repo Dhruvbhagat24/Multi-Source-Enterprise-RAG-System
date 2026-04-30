@@ -50,7 +50,8 @@ def rows_to_documents(
     rows: list[dict],
     source_id: str,
     source_file: str,
-    source_type: str
+    source_type: str,
+    user_id: str = None
 ):
     documents = []
 
@@ -76,6 +77,7 @@ def rows_to_documents(
                 "source_id": source_id,
                 "source_file": source_file,
                 "source_type": source_type,
+                "user_id": user_id,
                 "row_index": row_index,
                 "columns": ",".join(normalized_row.keys()),
                 "original_row": json.dumps(normalized_row)
@@ -252,7 +254,8 @@ def summarise_chunks(
             chunks,
             source_id: str,
             source_file: str,
-            source_type: str
+            source_type: str,
+            user_id: str = None
         ):
     """Process all chunks with AI Summaries"""
     print("🧠 Processing chunks with AI Summaries...")
@@ -296,6 +299,7 @@ def summarise_chunks(
                 "source_id": source_id,
                 "source_file": source_file,
                 "source_type": source_type,
+                "user_id": user_id,
                 "chunk_index": i + 1,
                 "total_chunks": total_chunks,
                 "original_content": json.dumps({
@@ -438,12 +442,14 @@ def run_complete_ingestion_pipeline(
     file_path: str,
     vector_store: VectorStoreManager,
     file_router: FileRouter,
-    original_filename: str = None
+    original_filename: str = None,
+    source_id: str = None,
+    user_id: str = None,
 ):
     print("🚀 Starting RAG Ingestion Pipeline")
     print("=" * 50)
 
-    source_id = str(uuid.uuid4())
+    source_id = source_id or str(uuid.uuid4())
     source_file = original_filename or os.path.basename(file_path)
 
     ingestor = file_router.route(file_path)
@@ -461,7 +467,8 @@ def run_complete_ingestion_pipeline(
             extracted,
             source_id=source_id,
             source_file=source_file,
-            source_type=source_type
+            source_type=source_type,
+            user_id=user_id
         )
     else:
         chunks = create_chunks_by_title(extracted)
@@ -474,7 +481,8 @@ def run_complete_ingestion_pipeline(
             chunks,
             source_id=source_id,
             source_file=source_file,
-            source_type=source_type
+            source_type=source_type,
+            user_id=user_id
         )
 
     if not documents:

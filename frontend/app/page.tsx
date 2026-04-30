@@ -35,7 +35,7 @@ const pageVariants = {
 };
 
 export default function Home() {
-  const { activeModule, setActiveModule, setCapabilities, sidebarOpen, toggleSidebar } = useApp();
+  const { activeModule, setCapabilities, sidebarOpen, toggleSidebar } = useApp();
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
   const [moduleAvailability, setModuleAvailability] = useState({
@@ -71,14 +71,6 @@ export default function Home() {
           settings: prev.settings || data.modules.settings,
           projects: prev.projects,
         }));
-
-        // Only redirect for backend-defined modules — skip client-only ones (projects)
-        const backendModules = data.modules as Record<string, boolean>;
-        if (activeModule in backendModules && !backendModules[activeModule]) {
-          if (data.modules.chat) setActiveModule("chat");
-          else if (data.modules.documents) setActiveModule("documents");
-          else if (data.modules.settings) setActiveModule("settings");
-        }
       }
     };
 
@@ -89,7 +81,7 @@ export default function Home() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [activeModule, setActiveModule, setCapabilities]);
+  }, [setCapabilities]);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
