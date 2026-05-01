@@ -4,15 +4,19 @@
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import AuthShell from "@/components/auth/AuthShell";
+import { normalizeEmail, validateSignupInput } from "@/lib/auth/validation";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   async function handleGoogle() {
+    setError(null);
     setIsLoading(true);
     await signIn("google", { callbackUrl: "/" });
   }
@@ -20,20 +24,27 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const validationError = validateSignupInput(email, password, confirmPassword);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setIsLoading(true);
     try {
+      const normalizedEmail = normalizeEmail(email);
       const res = await fetch("/api/auth/local/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
       if (res.status === 201) {
         // Automatically sign in after signup
-        const r: any = await signIn("credentials", { redirect: false, email, password });
+        const r: any = await signIn("credentials", { redirect: false, email: normalizedEmail, password });
         if (!r?.error) {
           router.push("/");
         } else {
-          setError(r.error || "Sign in failed");
+          setError("Account created, but sign in failed. Please sign in manually.");
           setIsLoading(false);
         }
       } else {
@@ -48,80 +59,56 @@ export default function SignupPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d1117" }} className="flex items-center justify-center p-4">
-      <div
-        style={{
-          background: "#161b22",
-          borderColor: "rgba(255, 255, 255, 0.1)",
-        }}
-        className="w-full max-w-[400px] rounded-2xl border p-8 shadow-lg"
-      >
-        <h2 className="text-xs font-medium text-gray-400 mb-6 text-center tracking-widest">eNeural Console</h2>
-        <h1 className="text-2xl font-semibold mb-6 text-center">Create account</h1>
-
-        <button
-          onClick={handleGoogle}
-          disabled={isLoading}
-          style={{ background: "#7c3aed" }}
-          className="w-full text-white py-2 rounded-lg mb-4 font-medium hover:opacity-90 transition disabled:opacity-50"
-        >
+    <AuthShell
+      title="Create account"
+      subtitle="Set up your account to start using eNeural Console."
+      bottomText="Already have an account?"
+      bottomLinkHref="/login"
+      bottomLinkLabel="Sign in"
+    >
+      <div className="auth-stack">
+        <button onClick={handleGoogle} disabled={isLoading} className="auth-primary-btn">
           Continue with Google
         </button>
 
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <div style={{ borderColor: "rgba(255, 255, 255, 0.1)" }} className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span style={{ background: "#161b22" }} className="px-2 text-gray-400">
-              or sign up with email
-            </span>
-          </div>
+        <div className="auth-divider">
+          <span>or sign up with email</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="auth-stack">
           <input
             type="email"
-            style={{
-              background: "#0d1117",
-              borderColor: "rgba(255, 255, 255, 0.1)",
-            }}
-            className="w-full p-3 rounded-xl bg-[#0d1117] text-white border placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] focus:ring-opacity-50 transition"
+            className="auth-input"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
             disabled={isLoading}
           />
           <input
             type="password"
-            style={{
-              background: "#0d1117",
-              borderColor: "rgba(255, 255, 255, 0.1)",
-            }}
-            className="w-full p-3 rounded-xl bg-[#0d1117] text-white border placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#7c3aed] focus:ring-opacity-50 transition"
+            className="auth-input"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
             disabled={isLoading}
           />
-          {error && <div className="text-sm text-red-400 font-medium">{error}</div>}
-          <button
-            type="submit"
+          <input
+            type="password"
+            className="auth-input"
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
             disabled={isLoading}
-            className="w-full py-3 rounded-lg text-white font-medium transition hover:opacity-90 disabled:opacity-50"
-            style={{ background: "#7c3aed" }}
-          >
+          />
+          {error && <div className="auth-error">{error}</div>}
+          <button type="submit" disabled={isLoading} className="auth-primary-btn">
             {isLoading ? "Creating account..." : "Create account"}
           </button>
         </form>
-
-        <div className="mt-6 text-sm text-center text-gray-400">
-          Already have an account?{" "}
-          <a href="/login" className="text-[#7c3aed] hover:underline font-medium">
-            Sign in
-          </a>
-        </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

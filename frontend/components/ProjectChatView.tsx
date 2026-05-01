@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Project } from "@/lib/store";
+import { renderMarkdownContent } from "./markdown";
 
 function SourcesCollapsible({ sources }: { sources: import("@/lib/api").Source[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -121,35 +122,39 @@ export default function ProjectChatView({ project, activeChatId, userId, onBack,
               </div>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
               <AnimatePresence mode="popLayout">
                 {messages.map((msg, idx) => (
                   <motion.div key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
-                    className={`flex items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${msg.role === "user" ? "bg-linear-to-br from-cyan-500 to-blue-600" : "bg-linear-to-br from-indigo-500 to-purple-600"}`}>
-                      <span className="text-[11px] font-bold text-white">{msg.role === "user" ? "U" : "AI"}</span>
-                    </div>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"}`}
-                      style={{ background: msg.role === "user" ? "rgba(6,182,212,0.08)" : "rgba(99,102,241,0.06)", border: `1px solid ${msg.role === "user" ? "rgba(6,182,212,0.12)" : "rgba(99,102,241,0.10)"}` }}>
-                      <p className="text-[14px] text-slate-200 leading-relaxed whitespace-pre-wrap">
-                        {msg.content}{msg.isStreaming && <span className="ml-0.5 inline-block h-3.5 w-0.5 bg-indigo-400 align-text-bottom animate-pulse" />}
-                      </p>
-                      {msg.sources && msg.sources.length > 0 && <SourcesCollapsible sources={msg.sources} />}
+                    className="flex w-full justify-center">
+                    <div className={`flex w-full max-w-[min(760px,84%)] items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${msg.role === "user" ? "bg-linear-to-br from-cyan-500 to-blue-600" : "bg-linear-to-br from-indigo-500 to-purple-600"}`}>
+                        <span className="text-[11px] font-bold text-white">{msg.role === "user" ? "U" : "AI"}</span>
+                      </div>
+                      <div className={`min-w-0 flex-1 rounded-2xl px-4 py-3 ${msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+                        style={{ background: msg.role === "user" ? "rgba(6,182,212,0.08)" : "rgba(99,102,241,0.06)", border: `1px solid ${msg.role === "user" ? "rgba(6,182,212,0.12)" : "rgba(99,102,241,0.10)"}` }}>
+                        <div className="markdown-content text-[14px] leading-relaxed text-slate-200">
+                          {renderMarkdownContent(msg.content)}{msg.isStreaming && <span className="ml-0.5 inline-block h-3.5 w-0.5 bg-indigo-400 align-text-bottom animate-pulse" />}
+                        </div>
+                        {msg.sources && msg.sources.length > 0 && <SourcesCollapsible sources={msg.sources} />}
+                      </div>
                     </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
               {isThinking && (
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
-                    <span className="text-[11px] font-bold text-white">AI</span>
-                  </div>
-                  <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.10)" }}>
-                    <div className="flex items-center gap-2">
-                      <div className="flex gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" /><span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} /><span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex w-full justify-center">
+                  <div className="flex w-full max-w-[min(760px,84%)] items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
+                      <span className="text-[11px] font-bold text-white">AI</span>
+                    </div>
+                    <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.10)" }}>
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce" /><span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} /><span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                        <span className="text-[12px] text-slate-500">Thinking...</span>
                       </div>
-                      <span className="text-[12px] text-slate-500">Thinking...</span>
                     </div>
                   </div>
                 </motion.div>

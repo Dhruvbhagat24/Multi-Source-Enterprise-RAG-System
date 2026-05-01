@@ -10,6 +10,9 @@ from providers.openai.embeddings import OpenAIEmbeddingModel
 from providers.ollama.llm import OllamaLLM
 from providers.huggingface.embeddings import HFEmbeddingModel
 
+# Cloud inference
+from providers.groq.llm import GroqLLM
+
 
 def get_llm(role: str) -> LLM:
     """
@@ -37,6 +40,9 @@ def get_llm(role: str) -> LLM:
     
     if provider == "ollama":
         return OllamaLLM(model=model)
+
+    if provider == "groq":
+        return GroqLLM(model=model)
 
     raise ValueError(f"Unsupported LLM provider: {provider}")
 

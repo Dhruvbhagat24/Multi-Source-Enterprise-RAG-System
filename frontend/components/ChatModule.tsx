@@ -4,6 +4,30 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/lib/store";
 import { sendChatMessage, uploadDocument, type Source } from "@/lib/api";
+import { renderMarkdownContent } from "./markdown";
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+type BrowserSpeechRecognitionCtor = new () => BrowserSpeechRecognition;
+
+function getSpeechRecognitionCtor(): BrowserSpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const win = window as Window & {
+    webkitSpeechRecognition?: BrowserSpeechRecognitionCtor;
+    SpeechRecognition?: BrowserSpeechRecognitionCtor;
+  };
+  return win.SpeechRecognition ?? win.webkitSpeechRecognition ?? null;
+}
 
 function getHighlightTerms(query: string): string[] {
   return query
@@ -119,6 +143,9 @@ function MessageBubble({
   resolvedProjectFiles,
   resolvedProjectMode,
   highlightTerms,
+  onSpeak,
+  isSpeaking,
+  isCached,
 }: {
   role: string;
   content: string;
@@ -127,6 +154,9 @@ function MessageBubble({
   resolvedProjectFiles?: string[];
   resolvedProjectMode?: string;
   highlightTerms: string[];
+  onSpeak?: (text: string) => void;
+  isSpeaking?: boolean;
+  isCached?: boolean;
 }) {
   const isUser = role === "user";
   const hasSelection = !isUser && (resolvedProjectFiles?.length ?? 0) > 0;
@@ -138,19 +168,21 @@ function MessageBubble({
       initial={{ opacity: 0, y: 15, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className={`flex w-full items-start gap-3 py-2 ${isUser ? "flex-row-reverse" : ""}`}
+      className={`flex w-full items-start gap-3.5 ${isUser ? "flex-row-reverse" : ""}`}
     >
       <div
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
-          isUser ? "bg-linear-to-br from-cyan-500 to-blue-600" : "shadow-glow bg-linear-to-br from-indigo-500 to-purple-600"
-        }`}
+        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isUser ? "bg-linear-to-br from-cyan-500 to-blue-600" : "shadow-glow bg-linear-to-br from-indigo-500 to-purple-600"
+          }`}
       >
         <span className="text-xs font-bold text-white">{isUser ? "U" : "AI"}</span>
       </div>
 
-      <div className={`max-w-[min(760px,84%)] ${isUser ? "glass rounded-2xl rounded-tr-sm px-4 py-3" : "glass rounded-2xl rounded-tl-sm px-4 py-3"}`}>
+      <div className={`max-w-[min(720px,82%)] ${isUser
+        ? "rounded-xl bg-[rgba(80,120,255,0.15)] px-4 py-2.5"
+        : "rounded-[14px] border border-white/5 bg-[rgba(20,25,40,0.6)] px-4 py-3.5 backdrop-blur-xl"
+        }`}>
         {hasSelection && (
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/25 bg-cyan-500/12 px-2.5 py-1 text-[10px] text-cyan-100">
+          <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/25 bg-cyan-500/12 px-2.5 py-1 text-[10px] text-cyan-100">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
             <span>
               Auto-selected: {primarySelection}
@@ -159,10 +191,33 @@ function MessageBubble({
             </span>
           </div>
         )}
-        <div className="markdown-content whitespace-pre-wrap text-sm leading-relaxed">
-          {content}
+        <div className="markdown-content text-sm">
+          {renderMarkdownContent(content)}
           {isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 cursor-blink bg-indigo-400 align-text-bottom" />}
         </div>
+        
+        {!isUser && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {content.trim() && onSpeak && (
+              <button
+                type="button"
+                onClick={() => onSpeak(content)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-400/20 bg-indigo-500/8 px-2.5 py-1.5 text-[11px] text-indigo-300 transition-all hover:bg-indigo-500/16 hover:text-indigo-200"
+                title="Read this answer aloud"
+              >
+                <span>{isSpeaking ? "■" : "🔊"}</span>
+                <span>{isSpeaking ? "Stop" : "Read aloud"}</span>
+              </button>
+            )}
+            
+            {isCached && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-400/20 bg-yellow-500/10 px-2.5 py-1.5 text-[11px] font-medium text-yellow-300">
+                <span>⚡</span>
+                <span>Answer retrieved from cache</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {sources && <SourcesPanel sources={sources} highlightTerms={highlightTerms} />}
       </div>
@@ -201,7 +256,7 @@ function WelcomeScreen() {
         Enterprise <span className="text-gradient">RAG Assistant</span>
       </h2>
       <p className="mb-8 max-w-2xl text-center text-base leading-relaxed text-slate-400 sm:text-lg">
-        Ask questions about your ingested documents. I&apos;ll retrieve relevant context and provide accurate, sourced answers.
+        Get accurate answers from your documents in seconds, powered by retrieval-augmented generation and backed by verifiable citations.
       </p>
 
       <div className="grid w-full max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
@@ -266,6 +321,7 @@ function useChatActions() {
         },
         (sources) => {
           setCurrentSources(sources);
+          setAIState("streaming");
           setMessages((prev) => {
             const updated = [...prev];
             const lastIdx = updated.length - 1;
@@ -329,17 +385,131 @@ function ChatInput() {
   const { handleSend } = useChatActions();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const voiceBaseInputRef = useRef("");
+  const voiceFinalTranscriptRef = useRef("");
   const attachButtonRef = useRef<HTMLButtonElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
 
   const isProcessing = aiState === "thinking" || aiState === "streaming";
+  const hasInfoNotice = Boolean(uploadNotice);
+  const hasErrorNotice = Boolean(voiceError);
+
+  const AttachmentMenuItem = ({
+    title,
+    onClick,
+    icon,
+    rightText,
+    rightIcon,
+    isActive,
+  }: {
+    title: string;
+    onClick: () => void;
+    icon: React.ReactNode;
+    rightText?: string;
+    rightIcon?: React.ReactNode;
+    isActive?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex h-9 w-full items-center justify-between rounded-[10px] px-3 py-2 text-left text-sm font-medium leading-5 text-[rgba(255,255,255,0.85)] transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/15 ${isActive ? "bg-white/8" : "bg-transparent hover:bg-white/6 hover:backdrop-blur-[20px]"
+        }`}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center text-white/80 opacity-75">
+          {icon}
+        </span>
+        <span className="min-w-0 truncate">{title}</span>
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-2 text-[13px] text-white/60">
+        {rightText && <span className="leading-none">{rightText}</span>}
+        {rightIcon && <span className="text-white/60">{rightIcon}</span>}
+      </span>
+    </button>
+  );
+
+  const AttachmentDivider = () => <div className="mx-2 my-1.5 h-px bg-white/6" />;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isProcessing && input.trim()) {
+      speechRecognitionRef.current?.stop();
+      setIsListening(false);
       handleSend(input);
       setInput("");
     }
+  };
+
+  const handleVoiceInput = () => {
+    if (isProcessing) return;
+    setVoiceError("");
+    const RecognitionCtor = getSpeechRecognitionCtor();
+    if (!RecognitionCtor) {
+      setVoiceError("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      speechRecognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new RecognitionCtor();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    voiceBaseInputRef.current = input.trim();
+    voiceFinalTranscriptRef.current = "";
+
+    recognition.onresult = (event) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+
+      for (let i = 0; i < event.results.length; i += 1) {
+        const piece = event.results[i][0]?.transcript ?? "";
+        if (!piece) continue;
+        if ((event.results[i] as { isFinal?: boolean }).isFinal) {
+          finalTranscript += piece;
+        } else {
+          interimTranscript += piece;
+        }
+      }
+      voiceFinalTranscriptRef.current = `${voiceFinalTranscriptRef.current} ${finalTranscript}`.trim();
+
+      const combined = `${voiceFinalTranscriptRef.current} ${interimTranscript}`.trim();
+      const base = voiceBaseInputRef.current;
+      const nextText = combined ? `${base}${base ? " " : ""}${combined}` : base;
+      setInput(nextText);
+    };
+    recognition.onerror = (event) => {
+      setVoiceError(event.error === "not-allowed" ? "Microphone permission denied." : "Voice capture failed.");
+      setIsListening(false);
+    };
+    recognition.onend = () => {
+      const finalText = voiceFinalTranscriptRef.current.trim();
+      if (!finalText) {
+        setVoiceError("No speech detected. Try again and speak clearly.");
+      } else if (!isProcessing) {
+        const base = voiceBaseInputRef.current;
+        const composed = `${base}${base ? " " : ""}${finalText}`.trim();
+        if (composed) {
+          handleSend(composed);
+          setInput("");
+        }
+      }
+      setIsListening(false);
+      voiceFinalTranscriptRef.current = "";
+    };
+
+    speechRecognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -362,24 +532,6 @@ function ChatInput() {
   const handleManageDocsAction = () => {
     setMenuOpen(false);
     setActiveModule("documents");
-  };
-
-  const handleCreateImageAction = () => {
-    setInput((prev) => (prev.trim() ? `${prev}\nCreate an image for this topic.` : "Create an image for: "));
-    setMenuOpen(false);
-    textareaRef.current?.focus();
-  };
-
-  const handleThinkingAction = () => {
-    setInput((prev) => (prev.trim() ? `Think step by step and answer:\n${prev}` : "Think step by step and answer: "));
-    setMenuOpen(false);
-    textareaRef.current?.focus();
-  };
-
-  const handleDeepResearchAction = () => {
-    setInput((prev) => (prev.trim() ? `Do deep research on: ${prev}` : "Do deep research on: "));
-    setMenuOpen(false);
-    textareaRef.current?.focus();
   };
 
   const handleUploadFiles = useCallback(async (files: File[]) => {
@@ -445,6 +597,16 @@ function ChatInput() {
   }, []);
 
   useEffect(() => {
+    setVoiceSupported(Boolean(getSpeechRecognitionCtor()));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      speechRecognitionRef.current?.stop();
+    };
+  }, []);
+
+  useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + "px";
@@ -464,155 +626,172 @@ function ChatInput() {
           aria-label="Attach documents"
         />
 
-        {uploadNotice && (
+        {/* Upload status is now visually merged into the input card below. */}
+        {hasErrorNotice && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
-            className="mb-2 flex items-center gap-2 rounded-xl border border-indigo-400/20 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-100"
+            className="mb-2 flex items-start gap-2 rounded-xl border border-rose-400/35 bg-linear-to-r from-rose-500/18 to-orange-500/14 px-3 py-2.5 text-xs text-rose-100 shadow-[0_8px_24px_-16px_rgba(244,63,94,0.85)] backdrop-blur-sm"
+            role="alert"
+            aria-live="polite"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-indigo-300" />
-            <span>{uploadNotice}</span>
+            <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-400/25 text-[10px] text-rose-100">
+              !
+            </span>
+            <span className="leading-relaxed">{voiceError}</span>
+            <button
+              type="button"
+              onClick={() => setVoiceError("")}
+              className="ml-auto rounded-md px-1.5 py-0.5 text-[11px] text-rose-100/80 transition hover:bg-white/10 hover:text-white"
+              aria-label="Dismiss error"
+              title="Dismiss"
+            >
+              ✕
+            </button>
           </motion.div>
         )}
 
-        <div className="relative glass-strong glow-border flex items-center gap-2.5 rounded-2xl border border-white/10 px-3.5 py-1.5 min-h-11 shadow-[0_18px_40px_rgba(4,8,20,0.45)]">
-          <AnimatePresence>
-            {menuOpen && (
+        <div className="relative overflow-visible rounded-[18px] border border-white/6 bg-[rgba(15,20,35,0.65)] shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-[18px]">
+          <AnimatePresence initial={false}>
+            {(hasInfoNotice || isUploading) && (
               <motion.div
-                ref={attachmentMenuRef}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.14 }}
-                className="absolute bottom-full left-0 z-30 mb-3 w-80 origin-bottom-left overflow-hidden rounded-2xl border border-white/10 bg-slate-800/96 p-3 shadow-[0_20px_44px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 36, opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="relative flex h-9 items-center justify-between bg-white/3 px-3.5 text-[13px] text-white/75"
               >
+                <span className="truncate pr-3">{uploadNotice || (isUploading ? "Uploading..." : "")}</span>
                 <button
                   type="button"
-                  onClick={handleUploadAction}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] leading-none text-white transition-colors hover:bg-white/7"
+                  onClick={() => setUploadNotice("")}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-white/60 transition hover:bg-white/6 hover:text-white/90"
+                  aria-label="Dismiss upload status"
+                  title="Dismiss"
                 >
-                  <span className="text-white/90">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.48" />
-                    </svg>
-                  </span>
-                  <span className="text-[15px] leading-none">Add photos & files</span>
+                  ✕
                 </button>
 
-                <div className="my-1.5 border-t border-white/15" />
-
-                <button
-                  type="button"
-                  onClick={handleCreateImageAction}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] leading-none text-white transition-colors hover:bg-white/7"
-                >
-                  <span className="text-white/90">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                  </span>
-                  <span className="text-[15px] leading-none">Create image</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleThinkingAction}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] leading-none text-white transition-colors hover:bg-white/7"
-                >
-                  <span className="text-white/90">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.8-2 2.3-2 4" />
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
-                  </span>
-                  <span className="text-[15px] leading-none">Thinking</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDeepResearchAction}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] leading-none text-white transition-colors hover:bg-white/7"
-                >
-                  <span className="text-white/90">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 10h4" />
-                      <path d="M12 8v4" />
-                      <path d="M12 14v6" />
-                      <path d="M8 20h8" />
-                      <path d="M3 10h4" />
-                      <path d="M17 10h4" />
-                    </svg>
-                  </span>
-                  <span className="text-[15px] leading-none">Deep research</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleManageDocsAction}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[15px] leading-none text-white transition-colors hover:bg-white/7"
-                >
-                  <span className="text-white/90">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="5" cy="12" r="1" />
-                      <circle cx="12" cy="12" r="1" />
-                      <circle cx="19" cy="12" r="1" />
-                    </svg>
-                  </span>
-                  <span className="text-[15px] leading-none">More</span>
-                  <span className="ml-auto text-white/80">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </span>
-                </button>
+                {isUploading && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 overflow-hidden">
+                    <motion.div
+                      className="h-full w-1/2 bg-linear-to-r from-[#6aa9ff] to-[#9b7bff] opacity-80"
+                      initial={{ x: "-60%" }}
+                      animate={{ x: "220%" }}
+                      transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
-          <button
-            ref={attachButtonRef}
-            type="button"
-            onClick={handleAttachClick}
-            disabled={isUploading || (capabilities ? !capabilities.modules.documents : false)}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-40 ${menuOpen ? "bg-indigo-500/20 text-indigo-300" : "hover:bg-white/10 hover:text-white"}`}
-            title="Attach documents"
-            aria-label="Attach documents"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
+          <div className="relative flex items-center gap-2.5 px-3.5 py-2.5">
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  ref={attachmentMenuRef}
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute bottom-full left-0 z-1200 mb-2 w-72 origin-bottom-left overflow-hidden rounded-2xl border border-white/6 bg-[rgba(15,20,35,0.65)] p-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-[18px] isolate"
+                >
+                  <div className="flex flex-col">
+                    <AttachmentMenuItem
+                      title="Add photos & files"
+                      onClick={handleUploadAction}
+                      rightText="Ctrl + U"
+                      isActive
+                      icon={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.48" />
+                        </svg>
+                      }
+                    />
 
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isProcessing ? "AI is generating..." : "Ask about your documents..."}
-            disabled={isProcessing}
-            rows={1}
-            id="chat-input"
-            className="flex-1 resize-none bg-transparent py-1 text-[14px] leading-6 text-white outline-none placeholder:text-slate-400"
-          />
+                    <AttachmentDivider />
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="submit"
-            disabled={isProcessing || !input.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white transition-all disabled:opacity-30"
-            style={{ background: input.trim() && !isProcessing ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(99,102,241,0.2)" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 2L11 13" />
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-            </svg>
-          </motion.button>
+                    <AttachmentMenuItem
+                      title="Open documents"
+                      onClick={handleManageDocsAction}
+                      icon={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <path d="M14 2v6h6" />
+                          <path d="M8 13h8" />
+                          <path d="M8 17h8" />
+                        </svg>
+                      }
+                      rightIcon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      }
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              ref={attachButtonRef}
+              type="button"
+              onClick={handleAttachClick}
+              disabled={isUploading || (capabilities ? !capabilities.modules.documents : false)}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/70 transition-all disabled:cursor-not-allowed disabled:opacity-40 ${menuOpen ? "bg-white/8 text-white/90" : "hover:bg-white/6 hover:text-white/95"
+                }`}
+              title="Attach documents"
+              aria-label="Attach documents"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isProcessing ? "AI is generating..." : "Ask about your documents..."}
+              disabled={isProcessing}
+              rows={1}
+              id="chat-input"
+              className="flex-1 resize-none bg-transparent py-1 text-[14px] leading-6 text-[rgba(255,255,255,0.9)] outline-none placeholder:text-white/45"
+            />
+            <button
+              type="button"
+              onClick={handleVoiceInput}
+              disabled={!voiceSupported || isProcessing}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 ${isListening ? "bg-rose-500/16 text-rose-200" : "text-white/70 hover:bg-white/6 hover:text-white/95"
+                }`}
+              title={voiceSupported ? (isListening ? "Stop listening" : "Voice input") : "Voice input not supported"}
+              aria-label="Voice input"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </button>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              disabled={isProcessing || !input.trim()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition-all disabled:opacity-30"
+              style={{ background: input.trim() && !isProcessing ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(255,255,255,0.06)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2L11 13" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+              </svg>
+            </motion.button>
+          </div>
         </div>
       </form>
     </div>
@@ -632,6 +811,7 @@ export default function ChatModule() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const didRestoreRef = useRef(false);
   const chatUnavailable = Boolean(capabilities && !capabilities.modules.chat);
+  const [speakingText, setSpeakingText] = useState("");
 
   const latestUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content || "";
   const highlightTerms = getHighlightTerms(latestUserMessage);
@@ -668,6 +848,33 @@ export default function ChatModule() {
       });
   }, [currentSessionId, messages.length, setCurrentSources, setMessages, userId]);
 
+  const handleSpeakMessage = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (speakingText === text) {
+      window.speechSynthesis.cancel();
+      setSpeakingText("");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onend = () => setSpeakingText("");
+    utterance.onerror = () => setSpeakingText("");
+    setSpeakingText(text);
+    window.speechSynthesis.speak(utterance);
+  }, [speakingText]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const hasMessages = messages.length > 0;
 
   return (
@@ -680,25 +887,41 @@ export default function ChatModule() {
 
       <div
         ref={scrollRef}
-        className={`flex-1 min-h-0 px-2 py-4 pb-82 sm:px-4 sm:py-6 sm:pb-90 ${hasMessages ? "overflow-y-auto" : "flex items-center justify-center overflow-y-auto"}`}
-      >
+        className={`flex-1 min-h-0 ${hasMessages ? "flex justify-center overflow-y-auto px-4 pt-8 pb-82 sm:px-6 sm:pt-12 sm:pb-90" : "flex items-center justify-center overflow-y-auto"
+          }`}      >
         {!hasMessages ? (
           <WelcomeScreen />
         ) : (
-          <div className="mx-auto w-full max-w-210 space-y-4">
+          <div className="flex w-full max-w-[820px] flex-col gap-5 pt-4 sm:pt-6">
             <AnimatePresence mode="popLayout">
-              {messages.map((msg, idx) => (
-                <MessageBubble
-                  key={idx}
-                  role={msg.role}
-                  content={msg.content}
+              {messages.map((msg, idx) => {
+                // Suppress the empty placeholder bubble while the custom ThinkingIndicator is active
+                if (
+                  aiState === "thinking" &&
+                  msg.role === "assistant" &&
+                  !msg.content &&
+                  !msg.sources &&
+                  idx === messages.length - 1
+                ) {
+                  return null;
+                }
+                
+                return (
+                  <MessageBubble
+                    key={idx}
+                    role={msg.role}
+                    content={msg.content}
                   sources={msg.sources}
                   isStreaming={msg.isStreaming}
                   resolvedProjectFiles={msg.resolved_project_files}
                   resolvedProjectMode={msg.resolved_project_mode}
                   highlightTerms={highlightTerms}
+                  onSpeak={handleSpeakMessage}
+                  isSpeaking={speakingText === msg.content}
+                  isCached={msg.is_cached}
                 />
-              ))}
+                );
+              })}
             </AnimatePresence>
 
             {aiState === "thinking" && <ThinkingIndicator />}

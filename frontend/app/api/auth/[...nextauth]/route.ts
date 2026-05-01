@@ -7,8 +7,8 @@ import { validateUser } from "@/lib/auth/users";
 const authOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      clientId: process.env.GOOGLE_CLIENT_ID?.trim() || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || "",
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -32,10 +32,34 @@ const authOptions = {
   callbacks: {
     async jwt({ token, user }: any) {
       if (user) {
-        // Store the backend user data explicitly
-        token.userId = user.id;
-        token.userEmail = user.email;
-        // Override NextAuth's default email (which comes from credentials input)
+        if (!token.userId) {
+          // For OAuth providers like Google, find or create user in backend
+          try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/auth/find-or-create`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: user.email }),
+            });
+            if (res.ok) {
+              const backendUser = await res.json();
+              token.userId = backendUser.id;
+              token.userEmail = backendUser.email;
+              console.log("✅ OAuth user created/found with UUID:", backendUser.id);
+            } else {
+              console.error("Failed to find or create user, status:", res.status);
+              const errorData = await res.json().catch(() => ({}));
+              console.error("Error details:", errorData);
+            }
+          } catch (e) {
+            console.error("❌ Failed to find or create user:", e);
+          }
+        } else {
+          // For credentials, already have backend user
+          token.userId = user.id;
+          token.userEmail = user.email;
+          console.log("✅ Credentials user loaded with UUID:", user.id);
+        }
+        // Override NextAuth's default email
         token.email = user.email;
         token.name = user.email?.includes("@") ? user.email.split("@")[0] : user.email;
       }
@@ -49,6 +73,11 @@ const authOptions = {
         email: token.userEmail,
         name: token.name || token.userEmail?.split("@")[0] || "User",
       };
+      if (!session.user.id) {
+        console.warn("⚠️ Session user missing UUID:", session.user);
+      } else {
+        console.log("✅ Session built with UUID:", session.user.id);
+      }
       return session;
     },
   },

@@ -1,15 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { createUser } from "@/lib/auth/users";
+import { normalizeEmail, validateNewCredentialsInput } from "@/lib/auth/validation";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { email, password } = body || {};
-    if (!email || !password)
-      return NextResponse.json({ error: "Missing email or password" }, { status: 400 });
+    const normalizedEmail = normalizeEmail(email ?? "");
+    const validationError = validateNewCredentialsInput(normalizedEmail, password ?? "");
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
 
-    const user = await createUser(email, password);
+    const user = await createUser(normalizedEmail, password);
     return NextResponse.json({ user }, { status: 201 });
   } catch (e: any) {
     if (e.message === "UserExists") {

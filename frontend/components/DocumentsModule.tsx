@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { uploadDocument, getDocuments, deleteDocument, type DocumentItem } from "@/lib/api";
+import { uploadDocument, getDocuments, deleteDocument, getDocumentStatus, type DocumentItem } from "@/lib/api";
 import { useApp } from "@/lib/store";
 
 /* ─── Helpers ───────────────────────────────────────────────────────── */
@@ -156,6 +156,7 @@ export default function DocumentsModule() {
   const [activeFile, setActiveFile] = useState<string>("");
   const documentsUnavailable = Boolean(capabilities && !capabilities.modules.documents);
 
+  // Global document reload every 10s
   useEffect(() => {
     if (!userId) return;
     const load = async () => {
@@ -170,9 +171,32 @@ export default function DocumentsModule() {
       } catch { /* keep existing */ }
     };
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
   }, [setPendingUploads, userId]);
+
+  // Fast polling for documents currently processing via Redis Status endpoint
+  useEffect(() => {
+    const processingDocs = documents.filter(d => d.status === "processing");
+    if (processingDocs.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const doc of processingDocs) {
+        try {
+          const res = await getDocumentStatus(doc.id);
+          if (res.status !== "processing" && res.status !== "unknown") {
+            setDocuments(prev => prev.map(d => 
+              d.id === doc.id ? { ...d, status: res.status as any } : d
+            ));
+          }
+        } catch (e) {
+          // Ignore polling errors
+        }
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [documents]);
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (!userId) return;

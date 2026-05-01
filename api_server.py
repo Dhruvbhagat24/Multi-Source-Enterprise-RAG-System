@@ -11,6 +11,10 @@ import importlib
 import re as _re
 from difflib import SequenceMatcher
 
+import hashlib
+import secrets
+import redis
+
 from typing import Any, List, Optional
 from pathlib import Path
 
@@ -37,6 +41,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Redis Setup ────────────────────────────────────────────────────────
+redis_client = None
+try:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client.ping()
+    print("[OK] Connected to Redis successfully.")
+except Exception as e:
+    print(f"[WARN] Redis connection failed: {e}. Falling back to in-memory/JSON storage.")
+    redis_client = None
+
 # ─── In-memory stores (would be DB in production) ───────────────────
 chat_sessions = {}   # dict of user_id -> dict of session_id -> list of messages
 documents_store = [] # list of document metadata dicts
@@ -53,8 +67,13 @@ DOCS_DIR = Path("./docs")
 DOCS_DIR.mkdir(exist_ok=True)
 
 
+def get_redis_chat_key(user_id: str, project_id: str, session_id: str) -> str:
+    """Generate the Redis key for a chat session."""
+    pid = project_id if project_id else "global"
+    return f"user:{user_id}:project:{pid}:session:{session_id}"
+
 def load_chat_sessions_from_disk():
-    """Load chat history from disk if available."""
+    """Load chat history. If Redis is active, it acts as the primary store, but we can fallback."""
     global chat_sessions
     if not SESSIONS_FILE.exists():
         chat_sessions = {}
@@ -68,18 +87,44 @@ def load_chat_sessions_from_disk():
         else:
             chat_sessions = {}
     except Exception:
-        # Keep server running even if history file is malformed.
         chat_sessions = {}
 
 
 def save_chat_sessions_to_disk():
-    """Persist chat history so sessions survive server restarts."""
+    """Persist chat history. If Redis is active, this is just a backup."""
     try:
         with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
             json.dump(chat_sessions, f, ensure_ascii=False, indent=2)
     except Exception:
-        # Persistence failures should not break API responses.
         pass
+
+def get_session_messages(user_id: str, project_id: str, session_id: str) -> list:
+    """Retrieve messages for a session from Redis (preferred) or memory fallback."""
+    if redis_client:
+        key = get_redis_chat_key(user_id, project_id, session_id)
+        data = redis_client.get(key)
+        if data:
+            # Refresh TTL on access (30 days)
+            redis_client.expire(key, 2592000)
+            return json.loads(data)
+        return []
+    else:
+        # Fallback to memory dict
+        user_chats = chat_sessions.get(user_id, {})
+        return user_chats.get(session_id, [])
+
+def save_session_messages(user_id: str, project_id: str, session_id: str, messages: list):
+    """Save messages for a session to Redis (preferred) or memory fallback."""
+    if redis_client:
+        key = get_redis_chat_key(user_id, project_id, session_id)
+        # Store as JSON string with 30-day TTL
+        redis_client.setex(key, 2592000, json.dumps(messages))
+    else:
+        # Fallback to memory dict
+        if user_id not in chat_sessions:
+            chat_sessions[user_id] = {}
+        chat_sessions[user_id][session_id] = messages
+        save_chat_sessions_to_disk()
 
 
 def load_projects_from_disk():
@@ -168,12 +213,17 @@ def find_user_by_email(email: str) -> Optional[dict]:
     return None
 
 
-def create_user(email: str, password: str) -> dict:
+def create_user(email: str, password: str = "") -> dict:
     if find_user_by_email(email):
         raise ValueError("User already exists")
     
-    salt = secrets.token_hex(16)
-    password_hash = hash_password(password, salt)
+    if password:
+        salt = secrets.token_hex(16)
+        password_hash = hash_password(password, salt)
+    else:
+        # For OAuth users, dummy values
+        salt = "oauth"
+        password_hash = "oauth"
     user_id = str(uuid.uuid4())
     
     try:
@@ -195,6 +245,10 @@ def validate_user(email: str, password: str) -> Optional[dict]:
     if not user:
         return None
     
+    if user["password_hash"] == "oauth":
+        # OAuth user, no password check
+        return {"id": user["id"], "email": user["email"]}
+    
     password_hash = hash_password(password, user["salt"])
     if password_hash == user["password_hash"]:
         return {"id": user["id"], "email": user["email"]}
@@ -208,6 +262,7 @@ _llm = None
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 RAG_CHUNK_CHARS = int(os.getenv("RAG_CHUNK_CHARS", "2000"))
 RAG_MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "8000"))
+RAG_ALLOW_LLM_FALLBACK = os.getenv("RAG_ALLOW_LLM_FALLBACK", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def is_documents_intent(message: str) -> bool:
@@ -257,6 +312,119 @@ def is_broad_concept_question(message: str) -> bool:
     likely_broad = any(text.startswith(s) for s in starters)
     token_count = len([t for t in text.replace("?", " ").split() if t])
     return likely_broad and token_count <= 8
+
+
+def extract_definition_target(message: str) -> Optional[str]:
+    """Extract a likely concept/term from definition-style questions."""
+    text = (message or "").strip()
+    if not text:
+        return None
+
+    lowered = text.lower().strip("?!. ")
+    definition_prefixes = [
+        "what is ",
+        "what are ",
+        "who is ",
+        "who are ",
+        "define ",
+        "meaning of ",
+        "explain ",
+        "explain me ",
+        "explain in simple words ",
+        "explain in simple language ",
+        "tell me about ",
+        "help me understand ",
+        "i don't understand ",
+        "i dont understand ",
+        "can you explain ",
+        "what do you mean by ",
+        "give definition of ",
+        "what is the meaning of ",
+        "in simple words ",
+        "in simple language ",
+    ]
+
+    for prefix in definition_prefixes:
+        if lowered.startswith(prefix):
+            concept = text[len(prefix):].strip(" ?!.,:;\"'")
+            # Remove trailing filler words like "like" from casual queries.
+            concept = _re.sub(r"\b(like|please|plz)\b\s*$", "", concept, flags=_re.IGNORECASE).strip()
+            if concept and len(concept.split()) <= 8:
+                return concept
+
+    return None
+
+
+def build_retrieval_queries(message: str, broad_query: bool) -> List[str]:
+    """Expand retrieval query for better term understanding and fuzzy asks."""
+    base = (message or "").strip()
+    if not base:
+        return []
+
+    queries: List[str] = [base]
+    concept = extract_definition_target(base)
+
+    if concept:
+        queries.extend(
+            [
+                concept,
+                f"{concept} definition",
+                f"{concept} meaning",
+                f"{concept} explained",
+                f"{concept} simple explanation",
+                f"{concept} beginner explanation",
+                f"explain {concept} from documents",
+                f"what is {concept}",
+                f"how does {concept} work",
+                f"uses of {concept}",
+                f"key points of {concept}",
+            ]
+        )
+
+    if broad_query:
+        queries.append(f"{base} in context of uploaded documents")
+        queries.append(f"explain this topic from the provided documents: {base}")
+
+    # Additional robust expansions to handle vague/misspelled/short asks.
+    normalized = normalize_match_text(base)
+    if normalized and normalized != base.lower().strip():
+        queries.append(normalized)
+    queries.extend(
+        [
+            f"{base} explained simply",
+            f"{base} key idea",
+            f"{base} summary",
+            f"definition and explanation: {base}",
+            f"context from ingested documents about: {base}",
+        ]
+    )
+
+    # Keep order, remove duplicates.
+    seen: set[str] = set()
+    unique: List[str] = []
+    for q in queries:
+        key = q.lower().strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(q)
+    return unique
+
+
+def generate_fallback_answer_without_sources(user_question: str) -> str:
+    """Generate a best-effort general answer when no document context was found."""
+    llm = get_llm()
+    fallback_prompt = f"""You are an enterprise assistant.
+
+The user asked a question, but no relevant chunks were retrieved from uploaded sources.
+Answer helpfully using general knowledge in simple language.
+Be explicit that this answer is NOT sourced from the user's documents.
+Keep answer concise, practical, and easy to understand.
+
+QUESTION: {user_question}
+"""
+    result = llm.invoke([HumanMessage(content=fallback_prompt)])
+    return result.content if hasattr(result, "content") else str(result)
 
 
 def dedupe_chunks(chunks: List[Any]) -> List[Any]:
@@ -591,6 +759,13 @@ def create_document_record(doc_meta: dict) -> Optional[str]:
     project_id = os.getenv("POSTGRES_DOCUMENTS_PROJECT_ID", "00000000-0000-0000-0000-000000000000")
     source_type = doc_meta.get("type", "upload")
 
+    # Validate user_id is a valid UUID
+    user_id = doc_meta.get("user_id")
+    try:
+        uuid.UUID(user_id)
+    except (ValueError, TypeError):
+        return f"Invalid user_id format: {user_id}"
+
     try:
         psycopg = importlib.import_module("psycopg")
     except Exception:
@@ -609,7 +784,7 @@ def create_document_record(doc_meta: dict) -> Optional[str]:
                     (
                         doc_meta.get("id"),
                         project_id,
-                        doc_meta.get("user_id"),
+                        user_id,
                         doc_meta.get("filename"),
                         source_type,
                         doc_meta.get("status", "processing"),
@@ -769,6 +944,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     session_id: Optional[str] = None
+    project_id: Optional[str] = None
     project_files: Optional[List[str]] = None
 
 
@@ -786,7 +962,7 @@ class ProjectsSyncRequest(BaseModel):
 
 class AuthRequest(BaseModel):
     email: str
-    password: str
+    password: Optional[str] = None
 
 
 class AuthResponse(BaseModel):
@@ -832,6 +1008,8 @@ async def health_check():
 # ─── Auth Endpoints ──────────────────────────────────────────────────
 @app.post("/api/auth/register", response_model=AuthResponse)
 async def register_endpoint(request: AuthRequest):
+    if not request.password:
+        raise HTTPException(status_code=400, detail="Password required for registration")
     try:
         user = create_user(request.email, request.password)
         return AuthResponse(**user)
@@ -840,10 +1018,59 @@ async def register_endpoint(request: AuthRequest):
 
 @app.post("/api/auth/login", response_model=AuthResponse)
 async def login_endpoint(request: AuthRequest):
+    if not request.password:
+        raise HTTPException(status_code=400, detail="Password required for login")
     user = validate_user(request.email, request.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     return AuthResponse(**user)
+
+@app.post("/api/auth/find-or-create", response_model=AuthResponse)
+async def find_or_create_user_endpoint(request: AuthRequest):
+    """Find or create user (OAuth flow). Always returns backend-generated UUID."""
+    try:
+        user = find_user_by_email(request.email)
+        if not user:
+            user = create_user(request.email, request.password or "")
+        
+        # Validate user_id is a valid UUID
+        try:
+            uuid.UUID(user.get("id"))
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid user UUID: {user.get('id')}")
+        
+        print(f"✅ Auth successful for {request.email}, UUID: {user.get('id')}")
+        return AuthResponse(**user)
+    except Exception as e:
+        print(f"❌ Error in find_or_create: {e}")
+        raise HTTPException(status_code=500, detail=f"Auth error: {str(e)}")
+
+
+@app.get("/api/auth/me")
+async def get_current_user(user_id: str):
+    """Get current user info (for debugging). Validates user_id format."""
+    try:
+        # Validate user_id is a valid UUID
+        uuid.UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail=f"Invalid user_id format: {user_id}. Expected UUID.")
+    
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, email, created_at FROM users WHERE id = %s::uuid", (user_id,))
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="User not found")
+                return {
+                    "id": str(row["id"]),
+                    "email": row["email"],
+                    "created_at": str(row.get("created_at", "")),
+                }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user: {str(e)}")
 
 
 # ─── Chat Endpoints ─────────────────────────────────────────────────
@@ -855,18 +1082,43 @@ async def chat(request: ChatRequest):
     """
     user_id = request.user_id
     session_id = request.session_id or str(uuid.uuid4())
+    project_id = request.project_id or ""
 
-    if user_id not in chat_sessions:
-        chat_sessions[user_id] = {}
-
-    if session_id not in chat_sessions[user_id]:
-        chat_sessions[user_id][session_id] = []
-
-    chat_sessions[user_id][session_id].append({
+    messages = get_session_messages(user_id, project_id, session_id)
+    messages.append({
         "role": "user",
         "content": request.message,
     })
-    save_chat_sessions_to_disk()
+    save_session_messages(user_id, project_id, session_id, messages)
+
+    # ─── Smart AI Response Caching ──────────────────────────────
+    query_hash = hashlib.sha256(request.message.strip().lower().encode()).hexdigest()
+    cache_key = f"cache:{user_id}:{project_id}:{query_hash}"
+
+    if redis_client:
+        cached_response = redis_client.get(cache_key)
+        if cached_response:
+            cached_data = json.loads(cached_response)
+            
+            async def generate_cached():
+                yield f"data: {json.dumps({'type': 'sources', 'data': cached_data.get('sources', [])})}\n\n"
+                
+                # Stream the cached answer quickly to simulate typing
+                words = cached_data["answer"].split()
+                for word in words:
+                    yield f"data: {json.dumps({'type': 'token', 'data': word + ' '})}\n\n"
+                    await asyncio.sleep(0.01)
+                
+                messages.append({
+                    "role": "assistant",
+                    "content": cached_data["answer"],
+                    "sources": cached_data.get("sources", []),
+                    "is_cached": True
+                })
+                save_session_messages(user_id, project_id, session_id, messages)
+                yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
+            
+            return StreamingResponse(generate_cached(), media_type="text/event-stream")
 
     async def generate():
         try:
@@ -880,12 +1132,15 @@ async def chat(request: ChatRequest):
                     yield f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
                     await asyncio.sleep(0)
 
-                chat_sessions[user_id][session_id].append({
+                messages.append({
                     "role": "assistant",
                     "content": answer,
                     "sources": sources,
                 })
-                save_chat_sessions_to_disk()
+                save_session_messages(user_id, project_id, session_id, messages)
+                
+                if redis_client:
+                    redis_client.setex(cache_key, 43200, json.dumps({"answer": answer, "sources": sources}))
 
                 yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
                 return
@@ -894,7 +1149,8 @@ async def chat(request: ChatRequest):
             # 1) Retrieve relevant chunks
             vs = get_vector_store()
             broad_query = is_broad_concept_question(request.message)
-            retrieve_k = max(RAG_TOP_K, 6) if broad_query else RAG_TOP_K
+            definition_target = extract_definition_target(request.message)
+            retrieve_k = max(RAG_TOP_K, 8) if (broad_query or definition_target) else RAG_TOP_K
 
             active_scope = get_active_documents_scope(user_id)
             active_filenames: set[str] = set()
@@ -944,9 +1200,7 @@ async def chat(request: ChatRequest):
                         "filter": {"user_id": user_id},
                     },
                 )
-                retrieval_queries = [request.message]
-                if broad_query:
-                    retrieval_queries.append(f"{request.message} in context of uploaded documents")
+                retrieval_queries = build_retrieval_queries(request.message, broad_query)
 
                 chunks = []
                 for q in retrieval_queries:
@@ -963,9 +1217,28 @@ async def chat(request: ChatRequest):
             chunks = dedupe_chunks(chunks)
 
             if not chunks:
-                answer = build_no_project_content_response(project_files) if project_files else "I couldn't find relevant content to answer your question."
+                if project_files:
+                    answer = build_no_project_content_response(project_files)
+                elif RAG_ALLOW_LLM_FALLBACK:
+                    try:
+                        answer = generate_fallback_answer_without_sources(request.message)
+                    except Exception:
+                        answer = "I couldn't find relevant source content, and fallback generation is currently unavailable."
+                else:
+                    answer = "I couldn't find relevant content to answer your question."
+
                 yield f"data: {json.dumps({'type': 'sources', 'data': []})}\n\n"
                 yield f"data: {json.dumps({'type': 'token', 'data': answer})}\n\n"
+                messages.append({
+                    "role": "assistant",
+                    "content": answer,
+                    "sources": [],
+                })
+                save_session_messages(user_id, project_id, session_id, messages)
+                
+                if redis_client:
+                    redis_client.setex(cache_key, 43200, json.dumps({"answer": answer, "sources": []}))
+                
                 yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
                 return
 
@@ -1008,6 +1281,7 @@ QUESTION: {request.message}
 Instructions:
 - Read the context carefully and answer based on what it contains.
 - For "what are the key topics" type questions, list the main subjects, themes, and content covered in the document.
+- If the user asks for the meaning/definition of a term, start with a simple definition in plain language, then tie it to the retrieved source context.
 - Do NOT say topics are "not explicitly mentioned" — instead describe what the document IS about.
 - Be specific and concrete, referencing actual content from the context.
 - Keep the answer concise."""
@@ -1054,8 +1328,11 @@ Instructions:
                 assistant_record["resolved_project_files"] = auto_selected_files
                 assistant_record["resolved_project_mode"] = selection_mode
 
-            chat_sessions[user_id][session_id].append(assistant_record)
-            save_chat_sessions_to_disk()
+            messages.append(assistant_record)
+            save_session_messages(user_id, project_id, session_id, messages)
+            
+            if redis_client:
+                redis_client.setex(cache_key, 43200, json.dumps({"answer": full_response, "sources": sources}))
 
             yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
 
@@ -1066,38 +1343,73 @@ Instructions:
 
 
 @app.get("/api/chat/sessions")
-async def list_sessions(user_id: Optional[str] = None):
+async def list_sessions(user_id: Optional[str] = None, project_id: Optional[str] = None):
     """List all chat sessions."""
     if not user_id:
         return {"sessions": []}
+    
     sessions = []
-    user_sessions = chat_sessions.get(user_id, {})
-    for sid, messages in user_sessions.items():
-        first_msg = next((m for m in messages if m["role"] == "user"), None)
-        sessions.append({
-            "id": sid,
-            "title": first_msg["content"][:50] + "..." if first_msg else "New Chat",
-            "message_count": len(messages),
-        })
+    
+    if redis_client:
+        pid = project_id if project_id else "*"
+        # Scan for all sessions for this user + project
+        keys = redis_client.keys(f"user:{user_id}:project:{pid}:session:*")
+        for key in keys:
+            data = redis_client.get(key)
+            if data:
+                messages = json.loads(data)
+                if messages:
+                    sid = key.split(":")[-1]
+                    first_msg = next((m for m in messages if m["role"] == "user"), None)
+                    sessions.append({
+                        "id": sid,
+                        "title": first_msg["content"][:50] + "..." if first_msg else "New Chat",
+                        "message_count": len(messages),
+                    })
+    else:
+        # Fallback to dict (Note: dict currently doesn't store project_id implicitly, so we just return all)
+        user_sessions = chat_sessions.get(user_id, {})
+        for sid, messages in user_sessions.items():
+            if messages:
+                first_msg = next((m for m in messages if m["role"] == "user"), None)
+                sessions.append({
+                    "id": sid,
+                    "title": first_msg["content"][:50] + "..." if first_msg else "New Chat",
+                    "message_count": len(messages),
+                })
+                
     return {"sessions": sessions}
 
 
 @app.get("/api/chat/sessions/{session_id}")
-async def get_session(session_id: str, user_id: str):
+async def get_session(session_id: str, user_id: str, project_id: Optional[str] = None):
     """Get messages for a specific session."""
-    user_sessions = chat_sessions.get(user_id, {})
-    if session_id not in user_sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "messages": user_sessions[session_id]}
+    pid = project_id if project_id else ""
+    messages = get_session_messages(user_id, pid, session_id)
+    if not messages:
+        # Check global if project_id was passed but failed
+        if pid:
+            messages = get_session_messages(user_id, "", session_id)
+        if not messages:
+            raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id, "messages": messages}
 
 
 @app.delete("/api/chat/sessions/{session_id}")
-async def delete_session(session_id: str, user_id: str):
+async def delete_session(session_id: str, user_id: str, project_id: Optional[str] = None):
     """Delete a chat session."""
+    if redis_client:
+        pid = project_id if project_id else "*"
+        keys = redis_client.keys(f"user:{user_id}:project:{pid}:session:{session_id}")
+        for key in keys:
+            redis_client.delete(key)
+            
+    # Fallback memory cleanup
     user_sessions = chat_sessions.get(user_id, {})
     if session_id in user_sessions:
         del user_sessions[session_id]
         save_chat_sessions_to_disk()
+        
     return {"status": "deleted"}
 
 
@@ -1124,6 +1436,16 @@ async def sync_projects(payload: ProjectsSyncRequest):
 async def upload_document(user_id: str = Form(...), file: UploadFile = File(...)):
     import traceback
     try:
+        # Validate user_id is a valid UUID before processing
+        try:
+            uuid.UUID(user_id)
+        except (ValueError, TypeError):
+            print(f"❌ Invalid user_id format: {user_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid user_id format. Expected UUID, got: {user_id}. Please log out and log back in."
+            )
+        
         doc_id = str(uuid.uuid4())
         original_filename = Path(file.filename).name
         print(f"📤 Upload received: {original_filename}")  # ← ADD
@@ -1178,14 +1500,29 @@ async def upload_document(user_id: str = Form(...), file: UploadFile = File(...)
 
                 await asyncio.to_thread(update_document_status, doc_id, "completed")
                 print(f"✅ Ingestion complete: {original_filename}")
+                if redis_client:
+                    redis_client.set(f"job:{doc_id}", "done")
             except Exception as e:
                 print(f"❌ Ingestion failed for {original_filename}: {e}")
                 import traceback
                 traceback.print_exc()
                 await asyncio.to_thread(update_document_status, doc_id, "failed", str(e))
+                if redis_client:
+                    redis_client.set(f"job:{doc_id}", "failed")
 
-        asyncio.create_task(process())
-        print(f"🚀 Background task created for: {original_filename}")  # ← ADD
+        if redis_client:
+            job_payload = {
+                "file_path": str(file_path),
+                "original_filename": original_filename,
+                "doc_id": doc_id,
+                "user_id": user_id
+            }
+            redis_client.lpush("queue:documents", json.dumps(job_payload))
+            redis_client.set(f"job:{doc_id}", "processing")
+            print(f"🚀 Pushed ingestion job to Redis queue for: {original_filename}")
+        else:
+            asyncio.create_task(process())
+            print(f"🚀 Background task created for: {original_filename}")
         return {"document": doc_meta}
 
     except HTTPException:
@@ -1194,6 +1531,23 @@ async def upload_document(user_id: str = Form(...), file: UploadFile = File(...)
         print(f"❌ Upload endpoint crashed: {e}")  # ← ADD
         traceback.print_exc()                       # ← ADD
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/documents/status/{doc_id}")
+async def get_document_status(doc_id: str):
+    """Real-time job tracking status."""
+    if not redis_client:
+        # Fallback to general documents list status if Redis is not running
+        for d in documents_store:
+            if d["id"] == doc_id:
+                return {"doc_id": doc_id, "status": d.get("status", "processing")}
+        return {"doc_id": doc_id, "status": "unknown"}
+        
+    status = redis_client.get(f"job:{doc_id}")
+    if status:
+        return {"doc_id": doc_id, "status": status}
+    
+    return {"doc_id": doc_id, "status": "unknown"}
 
 
 @app.get("/api/documents")

@@ -151,5 +151,475 @@
         ]
       }
     ]
+  },
+  "9d91aa7c-6871-47a9-816c-276a6a55f644": {
+    "653b0396-f768-4d2f-bb08-f08057061965": [
+      {
+        "role": "user",
+        "content": "What are the main topics covered?"
+      },
+      {
+        "role": "user",
+        "content": "What are the main topics covered?"
+      }
+    ]
+  },
+  "2d8bdb11-26b7-4daa-8411-de6544f345cc": {
+    "718ff5d2-fdc6-429f-9e11-334ad6645d6b": [
+      {
+        "role": "user",
+        "content": "What are the main topics covered?"
+      },
+      {
+        "role": "assistant",
+        "content": "**Main Topics Covered:**\n\n* **Consensus Mechanisms in Blockchain:**\n    * What is a consensus mechanism?\n    * Different consensus algorithms (e.g., Proof of Work, Proof of Stake)\n* **Byzantine Generals Problem and its Relevance:**\n    * Definition of Byzantine fault tolerance\n    * The problem and its impact on distributed systems\n* **Practical Byzantine Fault Tolerance (PBFT):**\n    * A consensus algorithm that addresses the limitations of Proof of Work\n* **Smart Contracts:**\n    * Definition of a smart contract\n    * How smart contracts work with an example\n* **Architecture of the Ethereum Blockchain:**\n    * Components of the Ethereum blockchain (e.g., nodes, blocks, smart contracts)",
+        "sources": [
+          {
+            "id": 1,
+            "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+            "metadata": {
+              "chunk_index": 3,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "total_chunks": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "a3edfebd-3ea4-4c43-86d1-2a48b23bc073",
+              "source_type": "pdf"
+            }
+          },
+          {
+            "id": 2,
+            "content": "Week 12:\n\n1. Discuss blockchain applications in:\n\ne Supply chain\n\ne Healthcare\n\ne Finance\n\n2. What is Decentralized Finance (DeFi)? Explain its components.\n\n3. Explain the concept of Non-Fungible Tokens (NFTs).\n\n4. What are the challenges in adopting blockchain in real-world syst",
+            "metadata": {
+              "source_id": "a3edfebd-3ea4-4c43-86d1-2a48b23bc073",
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "total_chunks": 7,
+              "chunk_index": 7
+            }
+          },
+          {
+            "id": 3,
+            "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+            "metadata": {
+              "source_id": "a3edfebd-3ea4-4c43-86d1-2a48b23bc073",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "chunk_index": 6,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_type": "pdf",
+              "total_chunks": 7
+            }
+          },
+          {
+            "id": 4,
+            "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+            "metadata": {
+              "chunk_index": 5,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "a3edfebd-3ea4-4c43-86d1-2a48b23bc073",
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc"
+            }
+          },
+          {
+            "id": 5,
+            "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+            "metadata": {
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "a3edfebd-3ea4-4c43-86d1-2a48b23bc073",
+              "total_chunks": 7,
+              "chunk_index": 1,
+              "source_type": "pdf"
+            }
+          },
+          {
+            "id": 6,
+            "content": "Q1. Discuss the problem and a two-point solution.\n\nAns. The problem was unclear, overly complex communication that confused employees. Joanne’s memo used bureaucratic and lengthy phrasing.\n\nSolution:\n\n1. Use simple, direct language with short sentences.\n\n2. Provide examples or bu",
+            "metadata": {
+              "source_id": "7385af77-981c-418e-8594-ad638ba796fe",
+              "chunk_index": 4,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_type": "pdf",
+              "source_file": "HS_CaseStudy.pdf",
+              "total_chunks": 4
+            }
+          },
+          {
+            "id": 7,
+            "content": "Q2. What lessons about organizational communication and product documentation can businesses learn from Sagatec’s experience?\n\nAns. Businesses can learn that product documentation must match the user’s skill level and needs. Effective communication should simplify complex informa",
+            "metadata": {
+              "chunk_index": 3,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_type": "pdf",
+              "total_chunks": 4,
+              "source_file": "HS_CaseStudy.pdf",
+              "source_id": "7385af77-981c-418e-8594-ad638ba796fe"
+            }
+          },
+          {
+            "id": 8,
+            "content": "Case study 1\n\nAs one of the first to enter the field of office automation, Sagatec Software, Inc. had built a reputation for designing high-quality and user-friendly database and accounting programs for business and industry. When they decided to enter the word-processing market,",
+            "metadata": {
+              "chunk_index": 1,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_type": "pdf",
+              "total_chunks": 4,
+              "source_id": "15f481c6-d585-4dd9-a9db-01f2ed9025f4",
+              "source_file": "HS_CaseStudy.pdf"
+            }
+          }
+        ]
+      }
+    ],
+    "280d8742-3e77-4126-9443-ea9d7b39cd13": [
+      {
+        "role": "user",
+        "content": "Summarize the Placement project"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure, here's a summary of the Placement project:\n\n**Key Topics:**\n\n* Introduction to Blockchain technology\n* Fundamentals of cryptography\n* Cryptographic hash functions\n* Blockchains and their architecture\n* Types of blockchains\n* Consensus mechanisms in blockchains\n* Smart contracts and their functionality\n\n**Meaning of Terms:**\n\n* **Blockchain:** A distributed database that stores data across multiple computers.\n* **Smart Contract:** A self-executing contract stored on the blockchain, automatically executing its terms when predefined conditions are met.",
+        "sources": [
+          {
+            "id": 1,
+            "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
+            "metadata": {
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_type": "pdf",
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf",
+              "total_chunks": 3,
+              "chunk_index": 1,
+              "source_id": "110ced1b-c0b3-4641-9c1f-f2a029b15216"
+            }
+          },
+          {
+            "id": 2,
+            "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
+            "metadata": {
+              "total_chunks": 3,
+              "chunk_index": 2,
+              "source_type": "pdf",
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_id": "110ced1b-c0b3-4641-9c1f-f2a029b15216",
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf"
+            }
+          },
+          {
+            "id": 3,
+            "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+            "metadata": {
+              "chunk_index": 3,
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf",
+              "source_type": "pdf",
+              "total_chunks": 3,
+              "user_id": "2d8bdb11-26b7-4daa-8411-de6544f345cc",
+              "source_id": "110ced1b-c0b3-4641-9c1f-f2a029b15216"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "9ec97dd3-937f-42c2-b53f-a68be2008b3c": {
+    "d2a0bdf2-29b6-4aad-9759-83e3e6b15899": [
+      {
+        "role": "user",
+        "content": "Summarize the key findings from uploaded documents"
+      },
+      {
+        "role": "assistant",
+        "content": "**Key Findings:**\n\n**Source 1**\n\n* **Architecture of Hyperledger Fabric:** A decentralized network built on top of a blockchain, where nodes collaborate to maintain a shared and tamper-proof record of transactions.\n* **Components:**\n    * Peer nodes: Ordinary nodes participating in the network, responsible for validating transactions and maintaining the blockchain.\n    * Ordering service: A component that facilitates the creation and execution of transactions, coordinating between nodes.\n    * Membership Service Provider (MSP): An external entity that manages the membership rules and provides security and governance functionalities to the network.\n* **Channel:** A channel is a logical grouping of peers who share a common purpose or function, enabling them to collaborate and share data efficiently.\n",
+        "sources": [
+          {
+            "id": 1,
+            "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+            "metadata": {
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_type": "pdf",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "total_chunks": 7,
+              "chunk_index": 5
+            }
+          },
+          {
+            "id": 2,
+            "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+            "metadata": {
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "chunk_index": 3,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_type": "pdf",
+              "total_chunks": 7
+            }
+          },
+          {
+            "id": 3,
+            "content": "Week 2:\n\n1. Explain the role of public key cryptography in blockchain systems.\n\nWhat are digital signatures? Explain the signing and verification process.\n\n2.\n\n3. Describe the Merkle Tree structure and its importance in blockchain.\n\nExplain how hash pointers help maintain the int",
+            "metadata": {
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "chunk_index": 2,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_type": "pdf",
+              "total_chunks": 7
+            }
+          },
+          {
+            "id": 4,
+            "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+            "metadata": {
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "chunk_index": 6
+            }
+          },
+          {
+            "id": 5,
+            "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+            "metadata": {
+              "source_type": "pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "total_chunks": 7,
+              "chunk_index": 1,
+              "source_file": "Question-Bank-Week1_Week12.pdf"
+            }
+          },
+          {
+            "id": 6,
+            "content": "Week 12:\n\n1. Discuss blockchain applications in:\n\ne Supply chain\n\ne Healthcare\n\ne Finance\n\n2. What is Decentralized Finance (DeFi)? Explain its components.\n\n3. Explain the concept of Non-Fungible Tokens (NFTs).\n\n4. What are the challenges in adopting blockchain in real-world syst",
+            "metadata": {
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "total_chunks": 7,
+              "chunk_index": 7
+            }
+          },
+          {
+            "id": 7,
+            "content": "Week 6:\n\n1. Discuss the use of blockchain in supply chain management.\n\n2. Explain how blockchain can improve healthcare data management.\n\n3. What is Decentralized Finance (DeFi)?\n\n4. Explain the role of blockchain in identity management systems.\n\n5. Discuss advantages and limitat",
+            "metadata": {
+              "total_chunks": 7,
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_type": "pdf",
+              "chunk_index": 4
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": "What is Blockchain technology?"
+      },
+      {
+        "role": "assistant",
+        "content": "## Key Topics:\n\n1. **Blockchain Technology:** Definition, basic structure, and components (data structure, nodes, consensus mechanism).\n2. **Centralized vs Decentralized Systems:** Comparison of control and data distribution across different types of systems.\n3. **Key Characteristics of Blockchain:** Transparency, immutability, and decentralization.\n4. **Cryptographic Concepts:** Definition of a cryptosystem, encryption, hashing, and its role in blockchain.",
+        "sources": [
+          {
+            "id": 1,
+            "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+            "metadata": {
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 1,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "total_chunks": 7
+            }
+          },
+          {
+            "id": 2,
+            "content": "Week 12:\n\n1. Discuss blockchain applications in:\n\ne Supply chain\n\ne Healthcare\n\ne Finance\n\n2. What is Decentralized Finance (DeFi)? Explain its components.\n\n3. Explain the concept of Non-Fungible Tokens (NFTs).\n\n4. What are the challenges in adopting blockchain in real-world syst",
+            "metadata": {
+              "chunk_index": 7,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "total_chunks": 7,
+              "source_type": "pdf"
+            }
+          },
+          {
+            "id": 3,
+            "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+            "metadata": {
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "chunk_index": 6,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_type": "pdf",
+              "total_chunks": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf"
+            }
+          },
+          {
+            "id": 4,
+            "content": "Week 6:\n\n1. Discuss the use of blockchain in supply chain management.\n\n2. Explain how blockchain can improve healthcare data management.\n\n3. What is Decentralized Finance (DeFi)?\n\n4. Explain the role of blockchain in identity management systems.\n\n5. Discuss advantages and limitat",
+            "metadata": {
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "chunk_index": 4
+            }
+          },
+          {
+            "id": 5,
+            "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+            "metadata": {
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 3,
+              "source_type": "pdf",
+              "total_chunks": 7,
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf"
+            }
+          },
+          {
+            "id": 6,
+            "content": "Week 2:\n\n1. Explain the role of public key cryptography in blockchain systems.\n\nWhat are digital signatures? Explain the signing and verification process.\n\n2.\n\n3. Describe the Merkle Tree structure and its importance in blockchain.\n\nExplain how hash pointers help maintain the int",
+            "metadata": {
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "total_chunks": 7,
+              "chunk_index": 2
+            }
+          },
+          {
+            "id": 7,
+            "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+            "metadata": {
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "chunk_index": 5,
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c"
+            }
+          }
+        ]
+      }
+    ],
+    "39bc66a8-fdab-447c-816a-744342a09bdd": [
+      {
+        "role": "user",
+        "content": "What are the main topics covered?"
+      },
+      {
+        "role": "assistant",
+        "content": "**Main Topics Covered:**\n\n* **Consensus Mechanisms in Blockchain:**\n    * What is a consensus mechanism?\n    * Different consensus algorithms (e.g., Proof of Work, Proof of Stake)\n* **Byzantine Generals Problem and its Relevance:**\n    * Definition of Byzantine fault tolerance\n    * The problem and its impact on distributed systems\n* **Practical Byzantine Fault Tolerance (PBFT):**\n    * A consensus algorithm that addresses the limitations of Proof of Work\n* **Smart Contracts:**\n    * Definition of a smart contract\n    * How smart contracts work with an example\n* **Architecture of the Ethereum Blockchain:**\n    * Components of the Ethereum blockchain (e.g., nodes, blocks, smart contracts)",
+        "sources": [
+          {
+            "id": 1,
+            "content": "Week 4:\n\n1. What is a consensus mechanism in blockchain?\n\n2. Compare the following consensus algorithms:\n\ne Proof of Work (PoW)\n\ne Proof of Stake (PoS)\n\n3. Explain the Byzantine Generals Problem and its relevance in distributed systems.\n\n4. What is Practical Byzantine Fault Toler",
+            "metadata": {
+              "total_chunks": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 3
+            }
+          },
+          {
+            "id": 2,
+            "content": "Week 12:\n\n1. Discuss blockchain applications in:\n\ne Supply chain\n\ne Healthcare\n\ne Finance\n\n2. What is Decentralized Finance (DeFi)? Explain its components.\n\n3. Explain the concept of Non-Fungible Tokens (NFTs).\n\n4. What are the challenges in adopting blockchain in real-world syst",
+            "metadata": {
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "total_chunks": 7,
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "chunk_index": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf"
+            }
+          },
+          {
+            "id": 3,
+            "content": "Week 10:\n\n1. What are the major scalability challenges in blockchain systems?\n\n2. Explain the concept of sharding in blockchain.\n\n3. What are Layer-2 solutions? Explain with examples.\n\n4. Compare on-chain vs off-chain scaling techniques.\n\n5. Explain how sidechains improve blockch",
+            "metadata": {
+              "chunk_index": 6,
+              "source_type": "pdf",
+              "total_chunks": 7,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5"
+            }
+          },
+          {
+            "id": 4,
+            "content": "Week 8:\n\n1. Describe the architecture of Hyperledger Fabric.\n\n2. Explain the role of the following components:\n\no Peer nodes\n\no Ordering service\n\no Membership Service Provider (MSP)\n\n3. What is a channel in Hyperledger Fabric? Why is it important?\n\n4. Explain the transaction life",
+            "metadata": {
+              "total_chunks": 7,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "chunk_index": 5
+            }
+          },
+          {
+            "id": 5,
+            "content": "## A Comprehensive Description of the Document\n\n**Key Facts:**\n\n* **Academic Year:** 2025-26\n* **Subject:** BLOCKCHAIN AND ITS APPLICATIONS (OCCE3004)\n* **Course Level:** Undergraduate\n* **Duration:** 6 Semester\n\n**Main Topics and Concepts:**\n\n* Introduction to Blockchain technol",
+            "metadata": {
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 1,
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf",
+              "source_id": "3717beea-0fe8-4276-957e-7f2ce5ecf3e1",
+              "total_chunks": 3,
+              "source_type": "pdf"
+            }
+          },
+          {
+            "id": 6,
+            "content": "CHAROTAR UNIVERSITY OF SCIENCE AND TECHNOLOGY (CHARUSAT) CHANDUBHAI S PATEL INSTITUTE OF TECHNOLOGY (CSPIT)\n\nOCCE3003: Blockchain and its Applications (NPTEL\n\nQuestion Bank (Week 1 — Week 12)\n\nWeek 1:\n\n1. What is Blockchain technology? Explain the basic structure of a blockchain ",
+            "metadata": {
+              "total_chunks": 7,
+              "source_file": "Question-Bank-Week1_Week12.pdf",
+              "source_type": "pdf",
+              "source_id": "46512933-3612-4f38-a26c-2b5ee347a8b5",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 1
+            }
+          },
+          {
+            "id": 7,
+            "content": "## CHAROTAT University of Science and Technology Faculty of Technology and Engineering (FTE) Chandubhai S. Patel Institute of Technology (CSPIT) Department of Computer Science & Engineering\n\n**Key Facts:**\n\n* Academic Year: 2025-26\n* Focus: Blockchain technology and cryptocurrenc",
+            "metadata": {
+              "source_type": "pdf",
+              "source_id": "3717beea-0fe8-4276-957e-7f2ce5ecf3e1",
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c",
+              "chunk_index": 3,
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf",
+              "total_chunks": 3
+            }
+          },
+          {
+            "id": 8,
+            "content": "## Certificate Participation Smart Contract\n\n**Key Facts:**\n\n* This contract facilitates the issuance and verification of certificates for students participating in academic events.\n* It uses the ERC-721 standard for tokenization and management of certificates.\n* The contract is ",
+            "metadata": {
+              "source_type": "pdf",
+              "source_id": "3717beea-0fe8-4276-957e-7f2ce5ecf3e1",
+              "source_file": "2025-26-NPTEL_OCCE3004-BCT-PracticalList.docx.pdf",
+              "chunk_index": 2,
+              "total_chunks": 3,
+              "user_id": "9ec97dd3-937f-42c2-b53f-a68be2008b3c"
+            }
+          }
+        ]
+      }
+    ]
   }
 }
