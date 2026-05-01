@@ -3,7 +3,7 @@ import "./globals.css";
 import NextAuthProvider from "./providers/NextAuthProvider";
 
 export const metadata: Metadata = {
-  title: "eNeural Console — Enterprise AI Assistant",
+  title: "DocuMind — Enterprise AI Assistant",
   description:
     "A production-grade RAG (Retrieval-Augmented Generation) system with immersive 3D visualization, multi-source document ingestion, and intelligent AI responses.",
   keywords: [

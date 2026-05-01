@@ -7,7 +7,6 @@ import json
 import uuid
 import asyncio
 import shutil
-import importlib
 import re as _re
 from difflib import SequenceMatcher
 
@@ -18,17 +17,15 @@ import redis
 from typing import Any, List, Optional
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
+import time
 
 from dotenv import load_dotenv
 load_dotenv()
-
-import hashlib
-import secrets
 
 # ─── App Setup ───────────────────────────────────────────────────────
 app = FastAPI(title="RAG System API", version="1.0.0")
@@ -57,6 +54,11 @@ documents_store = [] # list of document metadata dicts
 projects_store = {}  # dict of user_id -> list of project payload dicts
 users_store = []     # list of user objects { id, email, password_hash, salt }
 
+# ─── Enhancement Stores ───────────────────────────────────────────────
+auth_tokens = {}       # dict of token -> user_id
+user_doc_versions = {} # dict of user_id -> int
+rate_limit_store = {}  # dict of user_id -> list of timestamps
+
 SESSIONS_FILE = Path("./chat_sessions.json")
 PROJECTS_FILE = Path("./projects.json")
 USERS_FILE = Path("./users.json")
@@ -65,6 +67,56 @@ UPLOAD_DIR = Path("./uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 DOCS_DIR = Path("./docs")
 DOCS_DIR.mkdir(exist_ok=True)
+
+def load_users():
+    global users_store
+    if USERS_FILE.exists():
+        try:
+            with open(USERS_FILE, "r") as f:
+                users_store = json.load(f)
+        except:
+            users_store = []
+
+
+def save_users():
+    with open(USERS_FILE, "w") as f:
+        json.dump(users_store, f, indent=2)
+
+def find_user_by_email(email: str) -> Optional[dict]:
+    for user in users_store:
+        if user["email"] == email:
+            return user
+    return None
+
+
+def create_user(email: str, password: str = "") -> dict:
+    if find_user_by_email(email):
+        raise ValueError("User already exists")
+
+    salt = secrets.token_hex(16)
+    password_hash = hash_password(password, salt)
+
+    user = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": password_hash,
+        "salt": salt,
+    }
+
+    users_store.append(user)
+    save_users()
+    return {"id": user["id"], "email": user["email"]}
+
+
+def validate_user(email: str, password: str) -> Optional[dict]:
+    user = find_user_by_email(email)
+    if not user:
+        return None
+
+    password_hash = hash_password(password, user["salt"])
+    if password_hash == user["password_hash"]:
+        return {"id": user["id"], "email": user["email"]}
+    return None
 
 
 def get_redis_chat_key(user_id: str, project_id: str, session_id: str) -> str:
@@ -155,41 +207,11 @@ def save_projects_to_disk():
         # Persistence failures should not break API responses.
         pass
 
-
+load_users()
 load_chat_sessions_from_disk()
 load_projects_from_disk()
 
 
-def get_psycopg_connection():
-    dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
-    if not dsn:
-        raise ValueError("Missing POSTGRES_DOCUMENTS_DSN")
-    if dsn.startswith("postgresql+"):
-        dsn = "postgresql://" + dsn.split("://", 1)[1]
-    psycopg = importlib.import_module("psycopg")
-    psycopg_rows = importlib.import_module("psycopg.rows")
-    return psycopg.connect(dsn, row_factory=getattr(psycopg_rows, "dict_row"))
-
-
-def init_postgres_tables():
-    try:
-        with get_psycopg_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id UUID PRIMARY KEY,
-                        email VARCHAR(255) UNIQUE NOT NULL,
-                        password_hash VARCHAR(255) NOT NULL,
-                        salt VARCHAR(255) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-            conn.commit()
-    except Exception as e:
-        print(f"Warning: Failed to init users table: {e}")
-
-
-init_postgres_tables()
 
 
 def hash_password(password: str, salt: str) -> str:
@@ -197,62 +219,8 @@ def hash_password(password: str, salt: str) -> str:
     return hashlib.pbkdf2_hmac("sha512", password.encode(), salt.encode(), 100000).hex()
 
 
-def find_user_by_email(email: str) -> Optional[dict]:
-    try:
-        with get_psycopg_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-                row = cur.fetchone()
-                if row:
-                    # Format UUID object to string
-                    res = dict(row)
-                    res["id"] = str(res["id"])
-                    return res
-    except Exception as e:
-        print(f"Error finding user: {e}")
-    return None
 
 
-def create_user(email: str, password: str = "") -> dict:
-    if find_user_by_email(email):
-        raise ValueError("User already exists")
-    
-    if password:
-        salt = secrets.token_hex(16)
-        password_hash = hash_password(password, salt)
-    else:
-        # For OAuth users, dummy values
-        salt = "oauth"
-        password_hash = "oauth"
-    user_id = str(uuid.uuid4())
-    
-    try:
-        with get_psycopg_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (id, email, password_hash, salt) VALUES (%s, %s, %s, %s)",
-                    (user_id, email, password_hash, salt)
-                )
-            conn.commit()
-    except Exception as e:
-        raise ValueError(f"Failed to create user: {e}")
-        
-    return {"id": user_id, "email": email}
-
-
-def validate_user(email: str, password: str) -> Optional[dict]:
-    user = find_user_by_email(email)
-    if not user:
-        return None
-    
-    if user["password_hash"] == "oauth":
-        # OAuth user, no password check
-        return {"id": user["id"], "email": user["email"]}
-    
-    password_hash = hash_password(password, user["salt"])
-    if password_hash == user["password_hash"]:
-        return {"id": user["id"], "email": user["email"]}
-    return None
 
 # ─── Lazy-loaded RAG components ─────────────────────────────────────
 _vector_store = None
@@ -536,9 +504,9 @@ def infer_project_files_from_query(query: str, available_filenames: set[str]) ->
     return selected[:3]
 
 
-def infer_project_files_from_session(session_id: str) -> List[str]:
+def infer_project_files_from_session(user_id: str, session_id: str) -> List[str]:
     """Fallback to recently used source files in the current chat session."""
-    messages = chat_sessions.get(session_id, [])
+    messages = chat_sessions.get(user_id, {}).get(session_id, [])
     if not messages:
         return []
 
@@ -595,6 +563,11 @@ def build_no_project_content_response(project_files: List[str]) -> str:
     suffix = "" if len(project_files) <= 3 else f" and {len(project_files) - 3} more"
     return f"I couldn't find any indexed content for the current project files ({listed}{suffix}), so I can't answer this from the current project files."
 
+def find_user_by_id(user_id: str) -> Optional[dict]:
+    for user in users_store:
+        if user["id"] == user_id:
+            return user
+    return None
 
 def is_generic_insufficient_response(text: str) -> bool:
     """Detect generic refusal patterns when context actually exists."""
@@ -609,74 +582,12 @@ def is_generic_insufficient_response(text: str) -> bool:
 
 
 def get_documents_source_mode() -> str:
-    """Resolve where document metadata should be read from."""
-    mode = os.getenv("DOCUMENTS_METADATA_SOURCE", "memory").strip().lower()
-    if mode in {"postgres", "postgresql"}:
-        return "postgres"
-
-    if os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL"):
-        return "postgres"
-
     return "memory"
 
 
-def fetch_documents_from_postgres(user_id: str) -> tuple[List[dict], Optional[str]]:
-    """Fetch documents metadata rows from Postgres for a specific user."""
-    dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
-    if not dsn:
-        return [], "Missing POSTGRES_DOCUMENTS_DSN or DATABASE_URL"
-
-    if dsn.startswith("postgresql+"):
-        dsn = "postgresql://" + dsn.split("://", 1)[1]
-
-    query = "SELECT id, file_name as filename, chunk_count as size, status, source_type as type FROM documents WHERE user_id = %s::uuid AND is_deleted = false ORDER BY id DESC LIMIT 200"
-
-    try:
-        psycopg = importlib.import_module("psycopg")
-        psycopg_rows = importlib.import_module("psycopg.rows")
-        dict_row = getattr(psycopg_rows, "dict_row")
-    except Exception:
-        return [], "psycopg is not installed in this environment"
-
-    try:
-        with psycopg.connect(dsn) as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(query, (user_id,))
-                rows = cur.fetchall()
-    except Exception as e:
-        return [], str(e)
-
-    documents: List[dict] = []
-    for row in rows:
-        item = dict(row)
-        raw_status = str(item.get("status", "unknown"))
-        status_map = {
-            "active": "completed",
-            "pending": "processing",
-            "deleting": "processing",
-        }
-        documents.append(
-            {
-                "id": str(item.get("id", "unknown")),
-                "filename": str(item.get("filename", "unknown")),
-                "size": int(item.get("size") or 0),
-                "status": status_map.get(raw_status, raw_status),
-                "type": str(item.get("type", "unknown")),
-            }
-        )
-
-    return documents, None
-
-
-def get_documents_inventory(user_id: str) -> tuple[List[dict], str, Optional[str]]:
-    """Return documents and source mode; optionally returns retrieval error."""
-    source_mode = get_documents_source_mode()
-    if source_mode == "postgres":
-        docs, error = fetch_documents_from_postgres(user_id)
-        return docs, source_mode, error
-
-    # Note: documents_store is a fallback list, not yet keyed by user_id in this legacy branch.
-    return documents_store, source_mode, None
+def get_documents_inventory(user_id: str):
+    user_docs = [d for d in documents_store if d.get("user_id") == user_id]
+    return user_docs, "memory", None
 
 
 def get_active_documents_scope(user_id: str) -> Optional[tuple[set[str], set[str]]]:
@@ -744,109 +655,28 @@ def delete_vectors_for_document(doc_id: str, filename: Optional[str]) -> Optiona
 
 
 def create_document_record(doc_meta: dict) -> Optional[str]:
-    """Create a metadata row in the configured source and return an optional error."""
-    source_mode = get_documents_source_mode()
-    if source_mode != "postgres":
-        documents_store.append(doc_meta)
-        return None
-
-    dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
-    if not dsn:
-        return "Missing POSTGRES_DOCUMENTS_DSN or DATABASE_URL"
-    if dsn.startswith("postgresql+"):
-        dsn = "postgresql://" + dsn.split("://", 1)[1]
-
-    project_id = os.getenv("POSTGRES_DOCUMENTS_PROJECT_ID", "00000000-0000-0000-0000-000000000000")
-    source_type = doc_meta.get("type", "upload")
-
-    # Validate user_id is a valid UUID
-    user_id = doc_meta.get("user_id")
-    try:
-        uuid.UUID(user_id)
-    except (ValueError, TypeError):
-        return f"Invalid user_id format: {user_id}"
-
-    try:
-        psycopg = importlib.import_module("psycopg")
-    except Exception:
-        return "psycopg is not installed in this environment"
-
-    query = """
-        INSERT INTO documents (id, project_id, user_id, file_name, source_type, status, chunk_count, is_deleted, created_at, updated_at)
-        VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s, false, now(), now())
-    """
-
-    try:
-        with psycopg.connect(dsn) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    query,
-                    (
-                        doc_meta.get("id"),
-                        project_id,
-                        user_id,
-                        doc_meta.get("filename"),
-                        source_type,
-                        doc_meta.get("status", "processing"),
-                        int(doc_meta.get("size", 0)),
-                    ),
-                )
-            conn.commit()
-    except Exception as e:
-        return str(e)
-
+    documents_store.append(doc_meta)
     return None
 
 
 def update_document_status(doc_id: str, status: str, error_message: Optional[str] = None) -> Optional[str]:
-    """Update document status in configured source and return an optional error."""
-    source_mode = get_documents_source_mode()
-    if source_mode != "postgres":
-        for d in documents_store:
-            if d["id"] == doc_id:
-                d["status"] = status
-                if error_message:
-                    d["error"] = error_message
-                break
-        return None
-
-    dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
-    if not dsn:
-        return "Missing POSTGRES_DOCUMENTS_DSN or DATABASE_URL"
-    if dsn.startswith("postgresql+"):
-        dsn = "postgresql://" + dsn.split("://", 1)[1]
-
-    try:
-        psycopg = importlib.import_module("psycopg")
-    except Exception:
-        return "psycopg is not installed in this environment"
-
-    db_status = {
-        "completed": "active",
-    }.get(status, status)
-
-    query = """
-        UPDATE documents
-        SET status = %s,
-            updated_at = now(),
-            ingested_at = CASE WHEN %s = 'active' THEN now() ELSE ingested_at END
-        WHERE id = %s::uuid
-    """
-
-    try:
-        with psycopg.connect(dsn) as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (db_status, db_status, doc_id))
-            conn.commit()
-    except Exception as e:
-        return str(e)
-
+    for d in documents_store:
+        if d.get("id") == doc_id:
+            d["status"] = status
+            if error_message:
+                d["error"] = error_message
+            if status == "completed":
+                uid = d.get("user_id")
+                if uid:
+                    user_doc_versions[uid] = user_doc_versions.get(uid, 0) + 1
+            break
     return None
 
 
-def build_documents_inventory_answer() -> tuple[str, List[dict]]:
+
+def build_documents_inventory_answer(user_id: str):
     """Create a direct answer and source payload from configured document metadata."""
-    documents, source_mode, error = get_documents_inventory()
+    documents, source_mode, error = get_documents_inventory(user_id)
 
     if error:
         return f"I could not read ingested documents from {source_mode}: {error}", []
@@ -968,6 +798,16 @@ class AuthRequest(BaseModel):
 class AuthResponse(BaseModel):
     id: str
     email: str
+    token: Optional[str] = None
+
+async def get_optional_user(authorization: Optional[str] = Header(None)):
+    """Extract and validate token from Authorization header. Returns user_id if valid, else None."""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1].strip()
+        user_id = auth_tokens.get(token)
+        if user_id:
+            return user_id
+    return None
 
 
 # ─── Health Check ────────────────────────────────────────────────────
@@ -1012,7 +852,9 @@ async def register_endpoint(request: AuthRequest):
         raise HTTPException(status_code=400, detail="Password required for registration")
     try:
         user = create_user(request.email, request.password)
-        return AuthResponse(**user)
+        token = secrets.token_hex(32)
+        auth_tokens[token] = user["id"]
+        return AuthResponse(id=user["id"], email=user["email"], token=token)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1023,7 +865,10 @@ async def login_endpoint(request: AuthRequest):
     user = validate_user(request.email, request.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    return AuthResponse(**user)
+    
+    token = secrets.token_hex(32)
+    auth_tokens[token] = user["id"]
+    return AuthResponse(id=user["id"], email=user["email"], token=token)
 
 @app.post("/api/auth/find-or-create", response_model=AuthResponse)
 async def find_or_create_user_endpoint(request: AuthRequest):
@@ -1031,7 +876,7 @@ async def find_or_create_user_endpoint(request: AuthRequest):
     try:
         user = find_user_by_email(request.email)
         if not user:
-            user = create_user(request.email, request.password or "")
+            user = create_user(request.email, request.password)
         
         # Validate user_id is a valid UUID
         try:
@@ -1039,48 +884,49 @@ async def find_or_create_user_endpoint(request: AuthRequest):
         except (ValueError, TypeError):
             raise ValueError(f"Invalid user UUID: {user.get('id')}")
         
+        token = secrets.token_hex(32)
+        auth_tokens[token] = user.get("id")
         print(f"✅ Auth successful for {request.email}, UUID: {user.get('id')}")
-        return AuthResponse(**user)
+        return AuthResponse(id=user.get("id"), email=user.get("email"), token=token)
     except Exception as e:
         print(f"❌ Error in find_or_create: {e}")
         raise HTTPException(status_code=500, detail=f"Auth error: {str(e)}")
 
-
 @app.get("/api/auth/me")
-async def get_current_user(user_id: str):
-    """Get current user info (for debugging). Validates user_id format."""
-    try:
-        # Validate user_id is a valid UUID
-        uuid.UUID(user_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail=f"Invalid user_id format: {user_id}. Expected UUID.")
-    
-    try:
-        with get_psycopg_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id, email, created_at FROM users WHERE id = %s::uuid", (user_id,))
-                row = cur.fetchone()
-                if not row:
-                    raise HTTPException(status_code=404, detail="User not found")
-                return {
-                    "id": str(row["id"]),
-                    "email": row["email"],
-                    "created_at": str(row.get("created_at", "")),
-                }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch user: {str(e)}")
+async def get_current_user(user_id: str = None, auth_user: Optional[str] = Depends(get_optional_user)):
+    final_user_id = auth_user or user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    user = find_user_by_id(final_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
+    return {
+        "id": user["id"],
+        "email": user["email"]
+    } 
+    
 
 # ─── Chat Endpoints ─────────────────────────────────────────────────
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, auth_user: Optional[str] = Depends(get_optional_user)):
     """
     Chat endpoint with RAG retrieval.
     Returns a streaming response that sends tokens progressively.
     """
-    user_id = request.user_id
+    user_id = auth_user or request.user_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # ─── Rate Limiting ──────────────────────────────────────────────
+    now = time.time()
+    user_timestamps = rate_limit_store.get(user_id, [])
+    user_timestamps = [ts for ts in user_timestamps if now - ts < 60]
+    if len(user_timestamps) >= 20:
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    user_timestamps.append(now)
+    rate_limit_store[user_id] = user_timestamps
     session_id = request.session_id or str(uuid.uuid4())
     project_id = request.project_id or ""
 
@@ -1093,7 +939,8 @@ async def chat(request: ChatRequest):
 
     # ─── Smart AI Response Caching ──────────────────────────────
     query_hash = hashlib.sha256(request.message.strip().lower().encode()).hexdigest()
-    cache_key = f"cache:{user_id}:{project_id}:{query_hash}"
+    doc_version = user_doc_versions.get(user_id, 0)
+    cache_key = f"cache:{user_id}:{project_id}:{doc_version}:{query_hash}"
 
     if redis_client:
         cached_response = redis_client.get(cache_key)
@@ -1124,7 +971,7 @@ async def chat(request: ChatRequest):
         try:
             # Handle document inventory intent directly from metadata store.
             if is_documents_intent(request.message):
-                answer, sources = build_documents_inventory_answer()
+                answer, sources = build_documents_inventory_answer(user_id)
                 yield f"data: {json.dumps({'type': 'sources', 'data': sources})}\n\n"
 
                 for line in answer.split("\n"):
@@ -1168,7 +1015,7 @@ async def chat(request: ChatRequest):
                     selection_mode = "query"
 
             if not project_files:
-                session_files = infer_project_files_from_session(session_id)
+                session_files = infer_project_files_from_session(user_id, session_id)
                 session_selected_files = [f for f in session_files if f in active_filenames]
                 if session_selected_files:
                     project_files = session_selected_files
@@ -1415,25 +1262,33 @@ async def delete_session(session_id: str, user_id: str, project_id: Optional[str
 
 # ─── Projects Sync Endpoints ─────────────────────────────────────────
 @app.get("/api/projects")
-async def list_projects(user_id: Optional[str] = None):
+async def list_projects(user_id: Optional[str] = None, auth_user: Optional[str] = Depends(get_optional_user)):
     """Return all synced projects."""
-    if not user_id:
-        return {"projects": []}
-    return {"projects": projects_store.get(user_id, [])}
+    final_user_id = auth_user or user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return {"projects": projects_store.get(final_user_id, [])}
 
 
 @app.put("/api/projects")
-async def sync_projects(payload: ProjectsSyncRequest):
+async def sync_projects(payload: ProjectsSyncRequest, auth_user: Optional[str] = Depends(get_optional_user)):
     """Replace synced projects snapshot from frontend."""
+    final_user_id = auth_user or payload.user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
     global projects_store
-    projects_store[payload.user_id] = payload.projects
+    projects_store[final_user_id] = payload.projects
     save_projects_to_disk()
     return {"status": "synced", "count": len(payload.projects)}
 
 
 # ─── Document Endpoints ─────────────────────────────────────────────
 @app.post("/api/documents/upload")
-async def upload_document(user_id: str = Form(...), file: UploadFile = File(...)):
+async def upload_document(user_id: str = Form(...), file: UploadFile = File(...), auth_user: Optional[str] = Depends(get_optional_user)):
+    final_user_id = auth_user or user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    user_id = final_user_id
     import traceback
     try:
         # Validate user_id is a valid UUID before processing
@@ -1551,11 +1406,12 @@ async def get_document_status(doc_id: str):
 
 
 @app.get("/api/documents")
-async def list_documents(user_id: Optional[str] = None):
+async def list_documents(user_id: Optional[str] = None, auth_user: Optional[str] = Depends(get_optional_user)):
     """List all uploaded documents with their status for a specific user."""
-    if not user_id:
-        return {"documents": [], "source": "session"}
-    documents, source_mode, error = get_documents_inventory(user_id)
+    final_user_id = auth_user or user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    documents, source_mode, error = get_documents_inventory(final_user_id)
     response: dict[str, Any] = {"documents": documents, "source": source_mode}
     if error:
         response["error"] = error
@@ -1563,50 +1419,29 @@ async def list_documents(user_id: Optional[str] = None):
 
 
 @app.delete("/api/documents/{doc_id}")
-async def delete_document(doc_id: str, user_id: str):
-    """Delete a document record."""
-    source_mode = get_documents_source_mode()
-    if source_mode == "postgres":
-        dsn = os.getenv("POSTGRES_DOCUMENTS_DSN") or os.getenv("DATABASE_URL")
-        if dsn:
-            if dsn.startswith("postgresql+"):
-                dsn = "postgresql://" + dsn.split("://", 1)[1]
-            try:
-                psycopg = importlib.import_module("psycopg")
-                filename = None
-                with psycopg.connect(dsn) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "SELECT file_name FROM documents WHERE id = %s::uuid AND user_id = %s::uuid",
-                            (doc_id, user_id),
-                        )
-                        row = cur.fetchone()
-                        if row and row[0]:
-                            filename = str(row[0])
+async def delete_document(doc_id: str, user_id: str = None, auth_user: Optional[str] = Depends(get_optional_user)):
+    final_user_id = auth_user or user_id
+    if not final_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    global documents_store
 
-                        cur.execute(
-                            "UPDATE documents SET is_deleted = true, deleted_at = now(), updated_at = now() WHERE id = %s::uuid AND user_id = %s::uuid",
-                            (doc_id, user_id),
-                        )
-                    conn.commit()
+    filename = None
+    for d in documents_store:
+        if d.get("id") == doc_id:
+            filename = d.get("filename")
+            break
 
-                delete_error = await asyncio.to_thread(delete_vectors_for_document, doc_id, filename)
-                if delete_error:
-                    raise HTTPException(status_code=500, detail=f"Metadata deleted but vector cleanup failed: {delete_error}")
-            except Exception:
-                raise HTTPException(status_code=500, detail="Failed to delete document in postgres")
-    else:
-        global documents_store
-        filename = None
-        for d in documents_store:
-            if d.get("id") == doc_id:
-                filename = d.get("filename")
-                break
-        documents_store = [d for d in documents_store if d["id"] != doc_id]
+    documents_store = [d for d in documents_store if d["id"] != doc_id]
 
-        delete_error = await asyncio.to_thread(delete_vectors_for_document, doc_id, filename)
-        if delete_error:
-            raise HTTPException(status_code=500, detail=f"Metadata deleted but vector cleanup failed: {delete_error}")
+    delete_error = await asyncio.to_thread(delete_vectors_for_document, doc_id, filename)
+
+    if delete_error:
+        raise HTTPException(status_code=500, detail=delete_error)
+
+    # Invalidate cache
+    user_doc_versions[final_user_id] = user_doc_versions.get(final_user_id, 0) + 1
+
     return {"status": "deleted"}
 
 
@@ -1657,28 +1492,6 @@ async def update_settings(settings: SettingsUpdate):
         _vector_store = None
 
     return {"status": "updated", "message": "Settings updated. Changes take effect on next request."}
-
-
-# ─── Auth Endpoints ───────────────────────────────────────────────────
-@app.post("/auth/login")
-async def login(request: AuthRequest):
-    """Authenticate user with email and password."""
-    user = validate_user(request.email, request.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"user": user}
-
-
-@app.post("/auth/signup")
-async def signup(request: AuthRequest):
-    """Create a new user account."""
-    try:
-        user = create_user(request.email, request.password)
-        return {"user": user}
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Signup failed")
 
 
 # ─── Run ─────────────────────────────────────────────────────────────

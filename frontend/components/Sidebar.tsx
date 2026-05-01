@@ -259,7 +259,7 @@ export default function Sidebar({
                 </div>
                 <div>
                   <h1 className="text-[14px] font-semibold text-white leading-tight">Neural Console</h1>
-                  <p className="text-[10px] text-slate-500">Enterprise RAG</p>
+                  <p className="text-[10px] text-slate-500">DocuMind</p>
                 </div>
               </motion.div>
             )}
