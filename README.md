@@ -1,5 +1,3 @@
-# DocuMind
-
 A high-performance, multi-tenant Retrieval-Augmented Generation (RAG) platform designed for enterprise-grade document intelligence. This system features a NotebookLM-inspired interface, allowing users to organize documents into isolated projects, chat with multiple sources simultaneously, and maintain strict data privacy across accounts.
 
 ![Project Overview](https://img.shields.io/badge/Architecture-Multi--Tenant-blueviolet)
