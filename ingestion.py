@@ -50,7 +50,8 @@ def rows_to_documents(
     rows: list[dict],
     source_id: str,
     source_file: str,
-    source_type: str
+    source_type: str,
+    user_id: str = None
 ):
     documents = []
 
@@ -76,6 +77,7 @@ def rows_to_documents(
                 "source_id": source_id,
                 "source_file": source_file,
                 "source_type": source_type,
+                "user_id": user_id,
                 "row_index": row_index,
                 "columns": ",".join(normalized_row.keys()),
                 "original_row": json.dumps(normalized_row)
@@ -205,19 +207,19 @@ def create_ai_enhanced_summary(text: str, tables: List[str], images: List[str]) 
             for i, table in enumerate(tables):
                 prompt_text += f"Table {i+1}:\n{table}\n\n"
         
-                prompt_text += """
-                YOUR TASK:
-                Generate a comprehensive, searchable description that covers:
+            prompt_text += """
+            YOUR TASK:
+            Generate a comprehensive, searchable description that covers:
 
-                1. Key facts, numbers, and data points from text and tables
-                2. Main topics and concepts discussed  
-                3. Questions this content could answer
-                4. Visual content analysis (charts, diagrams, patterns in images)
-                5. Alternative search terms users might use
+            1. Key facts, numbers, and data points from text and tables
+            2. Main topics and concepts discussed  
+            3. Questions this content could answer
+            4. Visual content analysis (charts, diagrams, patterns in images)
+            5. Alternative search terms users might use
 
-                Make it detailed and searchable - prioritize findability over brevity.
+            Make it detailed and searchable - prioritize findability over brevity.
 
-                SEARCHABLE DESCRIPTION:"""
+            SEARCHABLE DESCRIPTION:"""
 
         # Build message content starting with text
         message_content = [{"type": "text", "text": prompt_text}]
@@ -234,8 +236,8 @@ def create_ai_enhanced_summary(text: str, tables: List[str], images: List[str]) 
         # response = llm.invoke([message])
         
         # return response.content
-        response_text = llm.invoke([message])
-        return response_text
+        response = llm.invoke([message])
+        return response.content if hasattr(response, 'content') else response
 
         
     except Exception as e:
@@ -252,7 +254,8 @@ def summarise_chunks(
             chunks,
             source_id: str,
             source_file: str,
-            source_type: str
+            source_type: str,
+            user_id: str = None
         ):
     """Process all chunks with AI Summaries"""
     print("🧠 Processing chunks with AI Summaries...")
@@ -296,6 +299,7 @@ def summarise_chunks(
                 "source_id": source_id,
                 "source_file": source_file,
                 "source_type": source_type,
+                "user_id": user_id,
                 "chunk_index": i + 1,
                 "total_chunks": total_chunks,
                 "original_content": json.dumps({
@@ -437,36 +441,54 @@ def ingest_folder(folder_path: str, vector_store: VectorStoreManager, file_route
 def run_complete_ingestion_pipeline(
     file_path: str,
     vector_store: VectorStoreManager,
-    file_router: FileRouter
+    file_router: FileRouter,
+    original_filename: str = None,
+    source_id: str = None,
+    user_id: str = None,
 ):
     print("🚀 Starting RAG Ingestion Pipeline")
     print("=" * 50)
 
-    source_id = str(uuid.uuid4())
-    source_file = os.path.basename(file_path)
+    source_id = source_id or str(uuid.uuid4())
+    source_file = original_filename or os.path.basename(file_path)
 
     ingestor = file_router.route(file_path)
     source_type = ingestor.__class__.__name__.replace("Ingestor", "").lower()
 
     extracted = ingestor.ingest(file_path)
+    if not extracted:
+        raise ValueError(
+            f"No extractable content found in '{source_file}'. "
+            "The file may be empty, image-only, or unsupported by the current parser settings."
+        )
 
-    # ---- Sheets (row-based ingestion) ----
     if source_type == "sheet":
         documents = rows_to_documents(
             extracted,
             source_id=source_id,
             source_file=source_file,
-            source_type=source_type
+            source_type=source_type,
+            user_id=user_id
         )
-
-    # ---- PDFs / DOCX (document-style ingestion) ----
     else:
         chunks = create_chunks_by_title(extracted)
+        if not chunks:
+            raise ValueError(
+                f"No chunks could be created from '{source_file}'. "
+                "Try a cleaner source file or adjust parser/chunking settings."
+            )
         documents = summarise_chunks(
             chunks,
             source_id=source_id,
             source_file=source_file,
-            source_type=source_type
+            source_type=source_type,
+            user_id=user_id
+        )
+
+    if not documents:
+        raise ValueError(
+            f"No documents were generated from '{source_file}'. "
+            "Ingestion aborted to prevent indexing empty content."
         )
 
     vector_store.add_documents(documents)
@@ -488,24 +510,6 @@ def run_complete_ingestion_pipeline(
 
 
 
-
-vector_store = VectorStoreManager(persist_directory="dbv2/chroma_db")
-
-ingest_folder(
-    "./docs",
-    vector_store,
-    file_router
-)
-
-#________________________________________________________________________________________________________________
-
-# Query the vector store
-# query = "How many attention heads does the Transformer use, and what is the dimension of each head? "
-query = "What is the payment method used for TXN-004?"
-
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-
-chunks = retriever.invoke(query)
 
 def generate_final_answer(chunks, query):
     """Generate final answer using multimodal content"""
@@ -576,6 +580,19 @@ def generate_final_answer(chunks, query):
         print(f"❌ Answer generation failed: {e}")
         return "Sorry, I encountered an error while generating the answer."
 
-# Usage
-final_answer = generate_final_answer(chunks, query)
-print(final_answer)
+if __name__ == "__main__":
+    # Manual/local test harness only. This must not run when imported by api_server.
+    vector_store = VectorStoreManager(persist_directory="dbv2/chroma_db")
+
+    ingest_folder(
+        "./docs",
+        vector_store,
+        file_router
+    )
+
+    query = "What is the payment method used for TXN-004?"
+    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+    chunks = retriever.invoke(query)
+
+    final_answer = generate_final_answer(chunks, query)
+    print(final_answer)

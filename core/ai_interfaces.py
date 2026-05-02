@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Iterator
 
 
 class LLM(ABC):
@@ -19,6 +19,16 @@ class LLM(ABC):
 
         returns:
             Generated text response
+        """
+        pass
+
+    @abstractmethod
+    def stream(self, messages: List[Any]) -> Iterator[str]:
+        """
+        Stream partial text output from the model.
+
+        Implementations should yield plain text chunks as soon as they are
+        available so the API can forward them directly to the frontend.
         """
         pass
 
