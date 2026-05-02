@@ -1,0 +1,16 @@
+fastapi==0.116.1
+uvicorn==0.35.0
+python-dotenv==1.2.2
+pydantic==2.12.5
+langchain==1.2.12
+langchain-chroma==1.1.0
+langchain-groq==1.1.2
+langchain-huggingface==1.0.1
+langchain-openai==1.1.11
+python-multipart==0.0.20
+redis==7.4.0
+sentence-transformers==5.3.0
+chromadb==1.5.5
+python-docx==1.2.0
+openpyxl==3.1.5
+unstructured==0.21.5
