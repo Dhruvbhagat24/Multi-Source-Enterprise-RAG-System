@@ -34,7 +34,7 @@ def process_job(job_payload):
     
     try:
         # Run the pipeline synchronously inside the worker process
-        run_complete_ingestion_pipeline(
+        chunk_count = run_complete_ingestion_pipeline(
             file_path,
             vs,
             fr,
@@ -46,7 +46,7 @@ def process_job(job_payload):
         vs.persist()
         
         # Update the document status in Postgres/JSON
-        update_document_status(doc_id, "completed")
+        update_document_status(doc_id, "completed", None, chunk_count)
         
         # Mark job as done in Redis
         redis_client.set(f"job:{doc_id}", "done")

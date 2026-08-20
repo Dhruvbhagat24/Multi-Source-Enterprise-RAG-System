@@ -21,7 +21,7 @@ const authOptions = {
         try {
           const user = await validateUser(credentials.email, credentials.password);
           return user; // returns { id, email } or null
-        } catch (e) {
+        } catch {
           return null;
         }
       },
@@ -30,20 +30,26 @@ const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }: any) {
+    async jwt({ token, user, profile }: any) {
       if (user) {
+        const resolvedEmail = user.email || profile?.email || token.userEmail || token.email;
         if (!token.userId) {
           // For OAuth providers like Google, find or create user in backend
-          try {
+          if (resolvedEmail) {
+            try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/auth/find-or-create`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: user.email }),
+              headers: {
+                "Content-Type": "application/json",
+                "X-Internal-Auth": process.env.INTERNAL_AUTH_SECRET || process.env.NEXTAUTH_SECRET || "",
+              },
+              body: JSON.stringify({ email: resolvedEmail }),
             });
             if (res.ok) {
               const backendUser = await res.json();
               token.userId = backendUser.id;
               token.userEmail = backendUser.email;
+              token.accessToken = backendUser.access_token;
               console.log("✅ OAuth user created/found with UUID:", backendUser.id);
             } else {
               console.error("Failed to find or create user, status:", res.status);
@@ -52,16 +58,20 @@ const authOptions = {
             }
           } catch (e) {
             console.error("❌ Failed to find or create user:", e);
+            }
+          } else {
+            console.error("❌ OAuth profile did not include an email address");
           }
         } else {
           // For credentials, already have backend user
-          token.userId = user.id;
-          token.userEmail = user.email;
-          console.log("✅ Credentials user loaded with UUID:", user.id);
+          if (user.id) token.userId = user.id;
+          if (user.email) token.userEmail = user.email;
+          if ((user as any).access_token) token.accessToken = (user as any).access_token;
+          console.log("✅ User loaded with UUID:", token.userId);
         }
         // Override NextAuth's default email
-        token.email = user.email;
-        token.name = user.email?.includes("@") ? user.email.split("@")[0] : user.email;
+        token.email = resolvedEmail;
+        token.name = resolvedEmail?.includes("@") ? resolvedEmail.split("@")[0] : resolvedEmail || token.name;
       }
       return token;
     },
@@ -72,6 +82,7 @@ const authOptions = {
         id: token.userId,
         email: token.userEmail,
         name: token.name || token.userEmail?.split("@")[0] || "User",
+        accessToken: token.accessToken,
       };
       if (!session.user.id) {
         console.warn("⚠️ Session user missing UUID:", session.user);

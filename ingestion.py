@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 from typing import List
 
 # Unstructured for document parsing
@@ -44,6 +45,14 @@ def normalize_for_json(value):
     return value
 
 
+def build_chunk_identity(source_id: str, logical_position: str, content: str) -> tuple[str, str]:
+    """Return a stable content hash and Chroma ID for one logical chunk."""
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    identity_input = f"{source_id}:{logical_position}:{content_hash}"
+    chunk_id = hashlib.sha256(identity_input.encode("utf-8")).hexdigest()
+    return chunk_id, content_hash
+
+
 
 #________________________________________________________________________________________________________________
 def rows_to_documents(
@@ -56,7 +65,7 @@ def rows_to_documents(
     documents = []
 
     for row in rows:
-        row_index = row.pop("_row_index", None)
+        row_index = row.get("_row_index")
 
         # Normalize row values
         normalized_row = {
@@ -70,19 +79,27 @@ def rows_to_documents(
             content_parts.append(f"{key}: {value}")
 
         text = ". ".join(content_parts)
+        logical_position = f"row:{row_index if row_index is not None else len(documents)}"
+        chunk_id, content_hash = build_chunk_identity(source_id, logical_position, text)
+        transaction_id = normalized_row.get("Transaction_ID")
 
         doc = Document(
             page_content=text,
+            id=chunk_id,
             metadata={
                 "source_id": source_id,
                 "source_file": source_file,
                 "source_type": source_type,
                 "user_id": user_id,
                 "row_index": row_index,
+                "chunk_id": chunk_id,
+                "content_hash": content_hash,
                 "columns": ",".join(normalized_row.keys()),
                 "original_row": json.dumps(normalized_row)
             }
         )
+        if transaction_id is not None and str(transaction_id).strip():
+            doc.metadata["transaction_id"] = str(transaction_id).strip().upper()
         documents.append(doc)
 
     return documents
@@ -293,8 +310,25 @@ def summarise_chunks(
             enhanced_content = content_data['text']
         
         # Create LangChain Document with rich metadata
+        stable_content = json.dumps(
+            {
+                "raw_text": content_data["text"],
+                "tables_html": content_data["tables"],
+                "images_base64": content_data["images"],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        logical_position = f"chunk:{i + 1}"
+        chunk_id, content_hash = build_chunk_identity(
+            source_id,
+            logical_position,
+            stable_content,
+        )
         doc = Document(
             page_content=enhanced_content,
+            id=chunk_id,
             metadata={
                 "source_id": source_id,
                 "source_file": source_file,
@@ -302,6 +336,8 @@ def summarise_chunks(
                 "user_id": user_id,
                 "chunk_index": i + 1,
                 "total_chunks": total_chunks,
+                "chunk_id": chunk_id,
+                "content_hash": content_hash,
                 "original_content": json.dumps({
                     "raw_text": content_data['text'],
                     "tables_html": content_data['tables'],
@@ -323,29 +359,6 @@ def summarise_chunks(
 #________________________________________________________________________________________________________________
 
 
-def export_chunks_to_json(chunks, filename="chunks_export.json"):
-    """Export processed chunks to clean JSON format"""
-    export_data = []
-    
-    for i, doc in enumerate(chunks):
-        chunk_data = {
-            "chunk_id": i + 1,
-            "enhanced_content": doc.page_content,
-            "metadata": {
-                "original_content": json.loads(doc.metadata.get("original_content", "{}"))
-            }
-        }
-        export_data.append(chunk_data)
-    
-    # Save to file
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(export_data, f, indent=2, ensure_ascii=False)
-    
-    print(f"✅ Exported {len(export_data)} chunks to {filename}")
-    return export_data
-
-# Export your chunks
-# json_data = export_chunks_to_json(processed_chunks)
 #________________________________________________________________________________________________________________
 
 # def create_vector_store(documents, persist_directory="dbv1/chroma_db"):
@@ -493,6 +506,7 @@ def run_complete_ingestion_pipeline(
 
     vector_store.add_documents(documents)
     print(f"🎉 Document ingestion completed: {source_file}")
+    return len(documents)
 
 #________________________________________________________________________________________________________________
 

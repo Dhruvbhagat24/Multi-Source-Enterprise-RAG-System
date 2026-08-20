@@ -92,7 +92,7 @@ export default function ProjectChatView({ project, activeChatId, userId, onBack,
       () => { setIsThinking(false); setIsStreaming(false); setMessages(prev => { const u = [...prev]; u[u.length - 1] = { ...u[u.length - 1], isStreaming: false }; saveChat(u, msgText); return u; }); },
       (error) => { setIsThinking(false); setIsStreaming(false); setMessages(prev => { const u = [...prev]; u[u.length - 1] = { ...u[u.length - 1], content: `❌ Error: ${error}`, isStreaming: false }; return u; }); }
     );
-  }, [chatInput, isThinking, isStreaming, project.files, saveChat]);
+  }, [chatInput, isThinking, isStreaming, project.files, saveChat, userId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } };
 

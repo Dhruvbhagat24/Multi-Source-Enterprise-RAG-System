@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession, signOut } from "next-auth/react";
 import { useApp, type ModuleType } from "@/lib/store";
-import { getChatSessions, deleteChatSession } from "@/lib/api";
+import { deleteChatSession } from "@/lib/api";
 
 // ─── Icons ──────────────────────────────────────────────────────────
 
@@ -102,7 +102,6 @@ export default function Sidebar({
     .join("")
     .toUpperCase()
     .slice(0, 2) || "U";
-  const [isHydrated, setIsHydrated] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -131,10 +130,6 @@ export default function Sidebar({
     setSelectedProjectId,
     userId,
   } = useApp();
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
@@ -187,17 +182,6 @@ export default function Sidebar({
     if (isMobile && sidebarOpen) toggleSidebar();
   };
 
-  useEffect(() => {
-    if (!userId) return;
-    const loadSessions = async () => {
-      try {
-        const data = await getChatSessions(userId);
-        setSessions(data);
-      } catch { /* keep existing */ }
-    };
-    loadSessions();
-  }, [setSessions, userId]);
-
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
@@ -208,11 +192,9 @@ export default function Sidebar({
 
   const handleSelectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
+    setMessages([]);
+    setCurrentSources([]);
     setActiveModule("chat");
-    if (!userId) return;
-    const { getChatSession } = await import("@/lib/api");
-    const messages = await getChatSession(sessionId, userId);
-    setMessages(messages);
     closeOnMobile();
   };
 
@@ -224,6 +206,7 @@ export default function Sidebar({
     if (currentSessionId === sessionId) {
       setCurrentSessionId(null);
       setMessages([]);
+      setCurrentSources([]);
     }
   };
 
@@ -281,7 +264,7 @@ export default function Sidebar({
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleNewChat}
-            className={`flex w-full items-center gap-3 rounded-lg text-[13px] font-medium text-white transition-colors hover:bg-white/5 ${
+            className={`flex w-full items-center gap-3 rounded-lg text-[14px] font-medium text-white transition-colors hover:bg-white/5 ${
               !showExpanded ? "justify-center" : ""
             }`}
             style={{ padding: '8px 10px' }}
@@ -295,7 +278,7 @@ export default function Sidebar({
             <button
               onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(""); }}
               className={`flex w-full items-center gap-3 rounded-lg text-[13px] transition-colors ${
-                searchOpen ? "bg-white/8 text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                searchOpen ? "bg-white/8 text-white" : "text-[14px] text-slate-400 hover:bg-white/5 hover:text-slate-200"
               } ${!showExpanded ? "justify-center" : ""}`}
               style={{ padding: '8px 10px' }}
               id="nav-search"
@@ -398,7 +381,7 @@ export default function Sidebar({
                 setActiveModule(item.id);
                 closeOnMobile();
               }}
-              className={`flex w-full items-center gap-3 rounded-lg text-[13px] transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-lg text-[14px] transition-colors ${
                 activeModule === item.id
                   ? "bg-white/8 font-medium text-white"
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
@@ -427,7 +410,7 @@ export default function Sidebar({
             {/* Projects header with chevron */}
             <button
               onClick={() => setProjectsExpanded(!projectsExpanded)}
-              className="flex w-full items-center gap-2 rounded-lg text-[12px] font-medium text-slate-500 transition-colors hover:text-slate-300"
+              className="flex w-full items-center gap-2 rounded-lg text-[14px] font-medium text-slate-500 transition-colors hover:text-slate-300"
               style={{ padding: '6px 10px', marginBottom: 2 }}
             >
               <motion.svg
@@ -458,7 +441,7 @@ export default function Sidebar({
                       // Trigger create modal via a custom event
                       window.dispatchEvent(new CustomEvent('open-create-project'));
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg text-[13px] text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
+                    className="flex w-full items-center gap-2.5 rounded-lg text-[14px] text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
                     style={{ padding: '7px 10px' }}
                     id="sidebar-new-project"
                   >
@@ -471,7 +454,7 @@ export default function Sidebar({
                   </button>
 
                   {/* Project list */}
-                  {(isHydrated ? projects : []).map((project) => (
+                  {projects.map((project) => (
                     <div key={project.id} className="relative">
                       <button
                         onClick={() => {

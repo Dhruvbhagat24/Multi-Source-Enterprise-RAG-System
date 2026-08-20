@@ -252,7 +252,7 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
         });
       }
     );
-  }, [chatInput, isThinking, isStreaming, anyFileProcessing, project, onUpdateProject, processingFiles]);
+  }, [chatInput, isThinking, isStreaming, anyFileProcessing, project, onUpdateProject, processingFiles, userId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
@@ -312,7 +312,7 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
         });
       }
     }
-  }, [onUpdateProject]);
+  }, [onUpdateProject, userId]);
 
   const handleAddFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) await uploadAndPoll(Array.from(e.target.files), project);
@@ -648,7 +648,7 @@ function ProjectDetailView({ project, onBack, onUpdateProject, onDeleteProject }
 /* ─── Main ──────────────────────────────────────────────────────────── */
 
 export default function ProjectsModule() {
-  const { projects, setProjects, selectedProjectId, setSelectedProjectId, userId } = useApp();
+  const { projects, setProjects, selectedProjectId, setSelectedProjectId } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"activity" | "name">("activity");
   const [showCreateModal, setShowCreateModal] = useState(false);

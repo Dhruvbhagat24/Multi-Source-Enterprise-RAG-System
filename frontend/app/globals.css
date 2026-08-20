@@ -125,6 +125,95 @@ h6 {
     box-shadow: 0 0 28px rgba(55, 216, 255, 0.12);
   }
 
+  .chat-scroll {
+    scrollbar-gutter: stable;
+  }
+
+  .chat-column {
+    max-width: 1120px;
+    padding-inline: 0.5rem;
+  }
+
+  .chat-column .markdown-content {
+    max-width: 680px;
+    color: #dbe5f3;
+    font-size: 0.92rem;
+    line-height: 1.68;
+  }
+
+  .message-row {
+    margin-inline: auto;
+  }
+
+  .message-row:not(.flex-row-reverse) {
+    justify-content: center;
+  }
+
+  .message-row.flex-row-reverse {
+    justify-content: flex-start;
+    max-width: 1120px;
+  }
+
+  .message-card {
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    padding: 0.85rem 1.1rem;
+    border-color: rgba(148, 163, 184, 0.14);
+  }
+
+  .message-card-assistant {
+    width: min(100%, 720px);
+    background: linear-gradient(145deg, rgba(24, 34, 58, 0.72), rgba(14, 22, 42, 0.62));
+  }
+
+  .message-card-user {
+    width: fit-content;
+    max-width: min(100%, 620px);
+    background: linear-gradient(145deg, rgba(30, 91, 145, 0.42), rgba(24, 57, 112, 0.38));
+    border-color: rgba(56, 189, 248, 0.22);
+  }
+
+  .chat-composer > div {
+    width: min(100%, 820px);
+    margin-inline: auto;
+  }
+
+  .chat-composer form {
+    max-width: none;
+  }
+
+  @media (max-width: 767px) {
+    .chat-column {
+      max-width: 100%;
+      padding-inline: 0;
+    }
+
+    .chat-column .markdown-content {
+      max-width: 100%;
+      font-size: 0.88rem;
+      line-height: 1.62;
+    }
+
+    .message-card-assistant,
+    .message-card-user {
+      width: min(100%, calc(100vw - 5.5rem));
+    }
+
+    .message-card-user {
+      width: fit-content;
+      max-width: calc(100vw - 5.5rem);
+    }
+
+    .chat-composer {
+      bottom: 0.9rem;
+    }
+
+    .chat-composer > div {
+      padding-inline: 0.75rem;
+    }
+  }
+
   .glow-border {
     position: relative;
   }
@@ -502,6 +591,7 @@ h6 {
 .markdown-content {
   line-height: 1.6;
   color: #cbd5e1;
+  overflow-wrap: anywhere;
 }
 
 .markdown-content h1,
@@ -514,7 +604,7 @@ h6 {
 
 .markdown-content h1 {
   font-size: 1.35em;
-  margin-top: 0.6em;
+  margin-top: 0;
   margin-bottom: 0.5em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid rgba(99, 102, 241, 0.18);
@@ -534,8 +624,12 @@ h6 {
 }
 
 .markdown-content p {
-  margin-bottom: 0.65em;
+  margin: 0.7em 0;
   line-height: 1.6;
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
 }
 
 .markdown-content p:last-child {
@@ -571,49 +665,24 @@ h6 {
 
 .markdown-content ul,
 .markdown-content ol {
-  padding-left: 0;
-  margin-top: 0.4em;
-  margin-bottom: 0.65em;
-  list-style: none;
+  padding-left: 1.35em;
+  margin: 0.7em 0;
 }
 
 .markdown-content ul li {
-  position: relative;
-  padding-left: 1.35em;
-  margin-bottom: 0.45em;
+  margin: 0.35em 0;
+  padding-left: 0.25em;
   line-height: 1.6;
-}
-
-.markdown-content ul li::before {
-  content: '→';
-  position: absolute;
-  left: 0;
-  top: 0;
-  color: #818cf8;
-  font-weight: 500;
-  font-size: 0.95em;
-}
-
-.markdown-content ol {
-  counter-reset: ol-counter;
 }
 
 .markdown-content ol li {
-  position: relative;
-  padding-left: 1.6em;
-  margin-bottom: 0.45em;
+  margin: 0.35em 0;
+  padding-left: 0.25em;
   line-height: 1.6;
-  counter-increment: ol-counter;
 }
 
-.markdown-content ol li::before {
-  content: counter(ol-counter) '.';
-  position: absolute;
-  left: 0;
-  top: 0;
+.markdown-content li::marker {
   color: #818cf8;
-  font-weight: 600;
-  font-size: 0.9em;
 }
 
 .markdown-content li:last-child {

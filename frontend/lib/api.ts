@@ -292,8 +292,8 @@ export async function getDocuments(userId: string): Promise<DocumentItem[]> {
   return data.documents || [];
 }
 
-export async function getDocumentStatus(docId: string): Promise<{ doc_id: string; status: string }> {
-  const res = await fetchWithRetry(`/api/documents/status/${docId}`, undefined, { retries: 1 });
+export async function getDocumentStatus(docId: string, userId: string): Promise<{ doc_id: string; status: string }> {
+  const res = await fetchWithRetry(`/api/documents/status/${docId}?user_id=${encodeURIComponent(userId)}`, undefined, { retries: 1 });
   if (!res.ok) throw new Error("Failed to load document status");
   return res.json();
 }

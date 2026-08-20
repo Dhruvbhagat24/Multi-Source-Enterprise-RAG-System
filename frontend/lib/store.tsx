@@ -12,6 +12,8 @@ import {
   type SyncedProject,
 } from "@/lib/api";
 
+export type { ChatMessage };
+
 // ─── Project chat type ──────────────────────────────────────────────
 export interface ProjectChat {
   id: string;
@@ -98,27 +100,6 @@ type PersistedProjectsState = {
   selectedProjectId: string | null;
 };
 
-function loadPersistedChatUI(): PersistedChatUI | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const raw = window.localStorage.getItem(CHAT_UI_STORAGE_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as Partial<PersistedChatUI>;
-    return {
-      messages: Array.isArray(parsed.messages) ? (parsed.messages as ChatMessage[]) : [],
-      currentSessionId:
-        typeof parsed.currentSessionId === "string" ? parsed.currentSessionId : null,
-      currentSources: Array.isArray(parsed.currentSources)
-        ? (parsed.currentSources as Source[])
-        : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
 function loadPersistedProjectsState(): PersistedProjectsState | null {
   if (typeof window === "undefined") return null;
 
@@ -139,7 +120,7 @@ function loadPersistedProjectsState(): PersistedProjectsState | null {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
-  const userId = (session?.user as any)?.id as string | undefined;
+  const userId = session?.user?.id;
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeModule, setActiveModule] = useState<ModuleType>("chat");
