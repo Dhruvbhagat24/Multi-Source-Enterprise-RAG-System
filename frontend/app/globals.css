@@ -158,7 +158,6 @@ h6 {
     min-width: 0;
     box-sizing: border-box;
     overflow-wrap: anywhere;
-    padding: 0.85rem 1.1rem;
     border-color: rgba(148, 163, 184, 0.14);
   }
 
@@ -423,6 +422,13 @@ h6 {
       font-size: 1.03rem;
     }
   }
+}
+
+.message-card {
+  min-width: 0;
+  max-width: calc(100% - 2.75rem);
+  padding: 0.85rem 1.1rem;
+  overflow-wrap: anywhere;
 }
 
 /* ─── Animations ───────────────────────────────────────────────────── */

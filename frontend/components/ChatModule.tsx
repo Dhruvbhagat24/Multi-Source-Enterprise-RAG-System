@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp, type ChatMessage } from "@/lib/store";
-import { sendChatMessage, uploadDocument, type Source } from "@/lib/api";
+import { editChatSession, getChatSessions, sendChatMessage, uploadDocument, type Source } from "@/lib/api";
 import { renderMarkdownContent } from "./markdown";
 
 function getHighlightTerms(query: string): string[] {
@@ -120,6 +120,9 @@ function MessageBubble({
   resolvedProjectFiles,
   resolvedProjectMode,
   highlightTerms,
+  messageIndex,
+  onEditMessage,
+  isBusy,
 }: {
   role: string;
   content: string;
@@ -128,11 +131,20 @@ function MessageBubble({
   resolvedProjectFiles?: string[];
   resolvedProjectMode?: string;
   highlightTerms: string[];
+  messageIndex: number;
+  onEditMessage: (messageIndex: number, content: string) => Promise<boolean>;
+  isBusy: boolean;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
   const isUser = role === "user";
   const hasSelection = !isUser && (resolvedProjectFiles?.length ?? 0) > 0;
   const primarySelection = resolvedProjectFiles?.[0] ?? "";
   const extraSelectionCount = Math.max((resolvedProjectFiles?.length ?? 0) - 1, 0);
+
+  const saveEdit = async () => {
+    if (await onEditMessage(messageIndex, editedContent)) setIsEditing(false);
+  };
 
   return (
     <motion.div
@@ -149,7 +161,13 @@ function MessageBubble({
         <span className="text-xs font-bold text-white">{isUser ? "U" : "AI"}</span>
       </div>
 
-      <div className={`message-card ${isUser ? "message-card-user glass rounded-2xl rounded-tr-sm px-4 py-3" : "message-card-assistant glass rounded-2xl rounded-tl-sm px-4 py-3"}`}>
+      <div
+        className={`message-card ${isUser ? "message-card-user glass rounded-2xl rounded-tr-sm" : "message-card-assistant glass rounded-2xl rounded-tl-sm"}`}
+        style={{
+          maxWidth: isUser ? "min(100%, 620px)" : "min(100%, 720px)",
+          padding: "0.85rem 1.1rem",
+        }}
+      >
         {hasSelection && (
           <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/25 bg-cyan-500/12 px-2.5 py-1 text-[10px] text-cyan-100">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
@@ -160,10 +178,56 @@ function MessageBubble({
             </span>
           </div>
         )}
-        <div className="markdown-content text-sm leading-relaxed">
-          {isUser ? content : renderMarkdownContent(content)}
-          {isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 cursor-blink bg-indigo-400 align-text-bottom" />}
-        </div>
+        {isEditing ? (
+          <div className="min-w-0">
+            <textarea
+              autoFocus
+              value={editedContent}
+              onChange={(event) => setEditedContent(event.target.value)}
+              rows={Math.min(Math.max(editedContent.split("\n").length, 2), 8)}
+              disabled={isBusy}
+              className="w-full resize-y rounded-lg border border-cyan-400/25 bg-slate-950/40 px-3 py-2 text-sm leading-relaxed text-slate-100 outline-none focus:border-cyan-300/60"
+            />
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setEditedContent(content); setIsEditing(false); }}
+                disabled={isBusy}
+                className="rounded-lg px-3 py-1.5 text-xs text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={isBusy || !editedContent.trim()}
+                className="rounded-lg bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-100 transition-colors hover:bg-cyan-500/25 disabled:opacity-50"
+              >
+                Save &amp; regenerate
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="markdown-content text-sm leading-relaxed">
+              {isUser ? content : renderMarkdownContent(content)}
+              {isStreaming && <span className="ml-0.5 inline-block h-4 w-0.5 cursor-blink bg-indigo-400 align-text-bottom" />}
+            </div>
+            {isUser && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setEditedContent(content); setIsEditing(true); }}
+                  disabled={isBusy}
+                  aria-label="Edit message"
+                  className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </>
+        )}
 
         {sources && <SourcesPanel sources={sources} highlightTerms={highlightTerms} />}
       </div>
@@ -222,10 +286,9 @@ function WelcomeScreen() {
   );
 }
 
-function useChatActions() {
+function useChatActions(loadSessions = true) {
   const {
     setMessages,
-    addMessage,
     currentSessionId,
     setCurrentSessionId,
     setAIState,
@@ -234,19 +297,43 @@ function useChatActions() {
     userId,
   } = useApp();
 
-  const handleSend = useCallback(
-    async (text: string) => {
+  useEffect(() => {
+    if (!loadSessions || !userId) return;
+
+    getChatSessions(userId)
+      .then((loadedSessions) => {
+        setSessions(loadedSessions);
+
+        try {
+          const storedSessionId = window.localStorage.getItem(`neural-console-current-chat-v1:${userId}`);
+          if (storedSessionId && loadedSessions.some((session) => session.id === storedSessionId)) {
+            setCurrentSessionId(storedSessionId);
+          }
+        } catch {
+          // Recents remain usable when browser storage is unavailable.
+        }
+      })
+      .catch(() => {
+        // Preserve cached recents when the session request fails.
+      });
+  }, [loadSessions, setCurrentSessionId, setSessions, userId]);
+
+  const streamMessage = useCallback(
+    async (text: string, sessionId: string | null) => {
       if (!text.trim() || !userId) return;
 
-      addMessage({ role: "user", content: text });
       setAIState("thinking");
 
       let assistantContent = "";
-      setMessages((prev) => [...prev, { role: "assistant", content: "", isStreaming: true }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: text },
+        { role: "assistant", content: "", isStreaming: true },
+      ]);
 
       await sendChatMessage(
         text,
-        currentSessionId,
+        sessionId,
         userId,
         null,
         (token) => {
@@ -282,7 +369,7 @@ function useChatActions() {
             return updated;
           });
 
-          import("@/lib/api").then(({ getChatSessions }) => getChatSessions(userId).then(setSessions));
+          getChatSessions(userId).then(setSessions);
           setTimeout(() => setAIState("idle"), 3000);
         },
         (error) => {
@@ -313,10 +400,31 @@ function useChatActions() {
         }
       );
     },
-    [addMessage, currentSessionId, setAIState, setCurrentSessionId, setCurrentSources, setMessages, setSessions, userId]
+    [setAIState, setCurrentSessionId, setCurrentSources, setMessages, setSessions, userId]
   );
 
-  return { handleSend };
+  const handleSend = useCallback((text: string) => {
+    void streamMessage(text, currentSessionId);
+  }, [currentSessionId, streamMessage]);
+
+  const handleEditMessage = useCallback(async (messageIndex: number, text: string) => {
+    if (!text.trim() || !userId || !currentSessionId) return false;
+
+    try {
+      const retainedMessages = await editChatSession(currentSessionId, userId, messageIndex);
+      setMessages(retainedMessages);
+      const lastAssistantWithSources = [...retainedMessages]
+        .reverse()
+        .find((message) => message.role === "assistant" && message.sources?.length);
+      setCurrentSources(lastAssistantWithSources?.sources ?? []);
+      await streamMessage(text, currentSessionId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [currentSessionId, setCurrentSources, setMessages, streamMessage, userId]);
+
+  return { handleSend, handleEditMessage };
 }
 
 function ChatInput() {
@@ -628,6 +736,7 @@ export default function ChatModule() {
     setCurrentSources,
     userId,
   } = useApp();
+  const { handleEditMessage } = useChatActions(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const restoredSessionRef = useRef<string | null>(null);
   const chatUnavailable = Boolean(capabilities && !capabilities.modules.chat);
@@ -681,11 +790,12 @@ export default function ChatModule() {
       <div
         ref={scrollRef}
         className={`chat-scroll flex-1 min-h-0 px-3 py-5 pb-32 sm:px-6 sm:py-8 sm:pb-36 ${hasMessages ? "overflow-y-auto" : "flex items-center justify-center overflow-y-auto"}`}
+        style={{ padding: "clamp(1.25rem, 4vh, 2rem) clamp(0.75rem, 2vw, 1.5rem) 9rem" }}
       >
         {!hasMessages ? (
           <WelcomeScreen />
         ) : (
-          <div className="chat-column mx-auto w-full space-y-5">
+          <div className="chat-column mx-auto flex w-full flex-col gap-6 sm:gap-8">
             <AnimatePresence mode="popLayout">
               {messages.map((msg, idx) => (
                 <MessageBubble
@@ -697,6 +807,9 @@ export default function ChatModule() {
                   resolvedProjectFiles={msg.resolved_project_files}
                   resolvedProjectMode={msg.resolved_project_mode}
                   highlightTerms={highlightTerms}
+                  messageIndex={idx}
+                  onEditMessage={handleEditMessage}
+                  isBusy={aiState === "thinking" || aiState === "streaming"}
                 />
               ))}
             </AnimatePresence>

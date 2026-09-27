@@ -30,11 +30,16 @@ const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user, profile }: any) {
+    async jwt({ token, user, profile, account }: any) {
       if (user) {
         const resolvedEmail = user.email || profile?.email || token.userEmail || token.email;
-        if (!token.userId) {
-          // For OAuth providers like Google, find or create user in backend
+        if (account?.provider === "credentials") {
+          token.userId = user.id;
+          token.userEmail = user.email;
+          token.accessToken = user.access_token;
+          console.log("✅ Credentials user loaded with UUID:", token.userId);
+        } else if (!token.userId) {
+          // OAuth providers like Google need backend user provisioning.
           if (resolvedEmail) {
             try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/auth/find-or-create`, {
@@ -62,12 +67,6 @@ const authOptions = {
           } else {
             console.error("❌ OAuth profile did not include an email address");
           }
-        } else {
-          // For credentials, already have backend user
-          if (user.id) token.userId = user.id;
-          if (user.email) token.userEmail = user.email;
-          if ((user as any).access_token) token.accessToken = (user as any).access_token;
-          console.log("✅ User loaded with UUID:", token.userId);
         }
         // Override NextAuth's default email
         token.email = resolvedEmail;

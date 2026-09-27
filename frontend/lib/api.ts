@@ -3,6 +3,8 @@
  * Central module for all backend communication.
  */
 
+import { getSession } from "next-auth/react";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const REQUEST_TIMEOUT_MS = 6000;
@@ -42,6 +44,12 @@ async function fetchWithRetry(
   const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const retries = options?.retries ?? RETRY_DELAYS_MS.length;
   const bases = getApiBaseCandidates();
+  const session = await getSession().catch(() => null);
+  const accessToken = (session?.user as { accessToken?: string } | undefined)?.accessToken;
+  const headers = new Headers(init?.headers);
+  if (accessToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
 
   let lastError: unknown;
 
@@ -56,6 +64,7 @@ async function fetchWithRetry(
       try {
         const response = await fetch(`${base}${path}`, {
           ...init,
+          headers,
           signal: controller.signal,
         });
         if (timer) clearTimeout(timer);
@@ -245,8 +254,9 @@ export async function sendChatMessage(
 
 export async function getChatSessions(userId: string): Promise<ChatSession[]> {
   const res = await fetchWithRetry(`/api/chat/sessions?user_id=${encodeURIComponent(userId)}`, undefined, { retries: 1 });
+  if (!res.ok) throw new Error("Failed to load chat sessions");
   const data = await res.json();
-  return data.sessions || [];
+  return Array.isArray(data.sessions) ? data.sessions : [];
 }
 
 export async function getChatSession(
@@ -260,6 +270,21 @@ export async function getChatSession(
   } catch {
     return [];
   }
+}
+
+export async function editChatSession(
+  sessionId: string,
+  userId: string,
+  messageIndex: number
+): Promise<ChatMessage[]> {
+  const res = await fetchWithRetry(`/api/chat/sessions/${sessionId}/edit`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, message_index: messageIndex }),
+  });
+  if (!res.ok) throw new Error("Failed to edit chat message");
+  const data = await res.json();
+  return Array.isArray(data.messages) ? data.messages : [];
 }
 
 export async function deleteChatSession(sessionId: string, userId: string): Promise<void> {
@@ -364,17 +389,17 @@ async function checkEndpoint(path: string): Promise<boolean> {
 export async function getBackendCapabilities(): Promise<BackendCapabilities> {
   const [
     healthOk,
-    sessionsOk,
-    docsOk,
     settingsData,
   ] = await Promise.all([
     checkEndpoint("/api/health"),
-    checkEndpoint("/api/chat/sessions"),
-    checkEndpoint("/api/documents"),
     getSettings().catch(() => null),
   ]);
 
-  const chatOk = sessionsOk;
+  // Session and document endpoints require user credentials, so probing them
+  // here without a user would produce expected 401 responses.
+  const chatOk = healthOk;
+  const sessionsOk = healthOk;
+  const docsOk = healthOk;
   const settingsOk = settingsData !== null;
 
   const providers = {

@@ -87,6 +87,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const CHAT_UI_STORAGE_KEY = "neural-console-chat-ui-v1";
+const CURRENT_CHAT_STORAGE_KEY = "neural-console-current-chat-v1";
 const PROJECTS_STORAGE_KEY = "neural-console-projects-v1";
 
 type PersistedChatUI = {
@@ -126,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeModule, setActiveModule] = useState<ModuleType>("chat");
   const [aiState, setAIState] = useState<AIState>("idle");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSources, setCurrentSources] = useState<Source[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -142,6 +143,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasHydratedLocalStateRef = useRef(false);
   const [pendingUploads, setPendingUploads] = useState<string[]>([]);
   const [capabilities, setCapabilities] = useState<BackendCapabilities | null>(null);
+
+  const setCurrentSessionId = useCallback((id: string | null) => {
+    setCurrentSessionIdState(id);
+    if (!userId || typeof window === "undefined") return;
+
+    const storageKey = `${CURRENT_CHAT_STORAGE_KEY}:${userId}`;
+    try {
+      if (id) window.localStorage.setItem(storageKey, id);
+      else window.localStorage.removeItem(storageKey);
+    } catch {
+      // Keep chat navigation working when browser storage is unavailable.
+    }
+  }, [userId]);
 
   useEffect(() => {
     // Only restore projects on startup.

@@ -191,9 +191,11 @@ export default function Sidebar({
   };
 
   const handleSelectSession = async (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    setMessages([]);
-    setCurrentSources([]);
+    if (currentSessionId !== sessionId) {
+      setCurrentSessionId(sessionId);
+      setMessages([]);
+      setCurrentSources([]);
+    }
     setActiveModule("chat");
     closeOnMobile();
   };
@@ -211,7 +213,7 @@ export default function Sidebar({
   };
 
   const visibleNavItems = navItems.filter((item) => availableModules[item.id]);
-  const recentSessions = [...sessions].reverse();
+  const recentSessions = sessions;
   const showExpanded = isMobile || sidebarOpen;
 
   return (
@@ -335,7 +337,7 @@ export default function Sidebar({
                   {/* Results */}
                   <div style={{ maxHeight: 240, overflowY: 'auto' }}>
                     {(() => {
-                      const filtered = [...sessions].reverse().filter((s) =>
+                      const filtered = sessions.filter((s) =>
                         s.title.toLowerCase().includes(searchQuery.toLowerCase())
                       );
                       if (filtered.length === 0) {
