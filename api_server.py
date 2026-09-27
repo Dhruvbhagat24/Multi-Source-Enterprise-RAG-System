@@ -348,7 +348,7 @@ def _json_value(value: Any, default: Any = None) -> Any:
     return default if value is None else value
 
 
-def get_session_messages(user_id: str, project_id: str, session_id: str) -> list:
+def get_session_messages(user_id: str, project_id: Optional[str], session_id: str) -> list:
     """Load durable conversation messages from PostgreSQL."""
     with get_psycopg_connection() as conn:
         with conn.cursor() as cur:
@@ -357,11 +357,11 @@ def get_session_messages(user_id: str, project_id: str, session_id: str) -> list
                 SELECT m.role, m.content, m.sources, m.is_cached
                 FROM messages m
                 JOIN conversations c ON c.id = m.conversation_id
-                WHERE c.id = %s AND c.user_id = %s::uuid
-                  AND c.project_id IS NOT DISTINCT FROM %s
+                                WHERE c.id = %s AND c.user_id = %s::uuid
+                                    AND (%s::text IS NULL OR c.project_id IS NOT DISTINCT FROM %s::text)
                 ORDER BY m.id
                 """,
-                (session_id, user_id, project_id or None),
+                                (session_id, user_id, project_id, project_id),
             )
             rows = cur.fetchall()
     return [
@@ -375,7 +375,7 @@ def get_session_messages(user_id: str, project_id: str, session_id: str) -> list
     ]
 
 
-def save_session_messages(user_id: str, project_id: str, session_id: str, messages: list):
+def save_session_messages(user_id: str, project_id: Optional[str], session_id: str, messages: list):
     """Persist conversations, messages, queries, and responses in one transaction."""
     from psycopg.types.json import Jsonb
 
@@ -461,6 +461,42 @@ def is_documents_intent(message: str) -> bool:
     has_list_word = any(word in text for word in ["what", "which", "list", "show", "display"])
     return has_doc_word and has_ingest_word and has_list_word
 
+def get_small_talk_response(message: str) -> Optional[str]:
+    """Return a short response for standalone greetings and casual check-ins."""
+    text = _re.sub(r"[^a-z0-9' ]+", " ", message.lower()).strip()
+    text = " ".join(text.split())
+
+    if _re.fullmatch(r"(?:hi+|hey+|hello+|howdy)(?: there)?", text):
+        return "Hi! How can I help you?"
+
+    if text in {
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good morning there",
+        "good afternoon there",
+        "good evening there",
+    }:
+        return "Good day! How can I help you?"
+
+    if text in {
+        "how are you",
+        "how are you doing",
+        "how was the day",
+        "how was your day",
+        "how is the day",
+        "how is your day",
+        "how is your day going",
+        "how has your day been",
+        "how's your day",
+        "how's your day going",
+        "how are things",
+        "how's it going",
+    }:
+        return "I'm doing well, thanks for asking! How can I help you today?"
+
+    return None
+
 
 def is_broad_concept_question(message: str) -> bool:
     """Detect broad conceptual questions that benefit from wider retrieval."""
@@ -481,6 +517,7 @@ def is_broad_concept_question(message: str) -> bool:
     ]
     likely_broad = any(text.startswith(s) for s in starters)
     token_count = len([t for t in text.replace("?", " ").split() if t])
+
     return likely_broad and token_count <= 8
 
 
@@ -724,7 +761,7 @@ def infer_project_files_from_query(query: str, available_filenames: set[str]) ->
     return selected[:3]
 
 
-def infer_project_files_from_session(user_id: str, project_id: str, session_id: str) -> List[str]:
+def infer_project_files_from_session(user_id: str, project_id: Optional[str], session_id: str) -> List[str]:
     """Fallback to recently used source files in the current chat session."""
     messages = get_session_messages(user_id, project_id, session_id)
     if not messages:
@@ -1304,6 +1341,12 @@ class ChatRequest(BaseModel):
     project_files: Optional[List[str]] = None
 
 
+class EditChatSessionRequest(BaseModel):
+    user_id: str
+    message_index: int
+    project_id: Optional[str] = None
+
+
 class SettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
@@ -1489,7 +1532,7 @@ async def chat(
         (time.perf_counter() - authentication_started) * 1000, 2
     )
     session_id = request.session_id or str(uuid.uuid4())
-    project_id = request.project_id or ""
+    project_id = request.project_id
 
     session_load_started = time.perf_counter()
     messages = get_session_messages(user_id, project_id, session_id)
@@ -1508,7 +1551,27 @@ async def chat(
 
     # ─── Smart AI Response Caching ──────────────────────────────
     query_hash = hashlib.sha256(request.message.strip().lower().encode()).hexdigest()
-    cache_key = f"cache:{user_id}:{project_id}:{query_hash}"
+    cache_key = f"cache:{user_id}:{project_id or ''}:{query_hash}"
+
+    small_talk_response = get_small_talk_response(request.message)
+    if small_talk_response:
+        async def generate_small_talk():
+            yield f"data: {json.dumps({'type': 'sources', 'data': []})}\n\n"
+            yield f"data: {json.dumps({'type': 'token', 'data': small_talk_response})}\n\n"
+
+            messages.append({
+                "role": "assistant",
+                "content": small_talk_response,
+                "sources": [],
+            })
+            save_session_messages(user_id, project_id, session_id, messages)
+            timing["outcome"] = "small_talk"
+            timing["final_sse_done_event_ms"] = elapsed_ms(request_started)
+            timing["total_request_duration_ms"] = timing["final_sse_done_event_ms"]
+            log_chat_timing(request_id, timing)
+            yield f"data: {json.dumps({'type': 'done', 'data': session_id})}\n\n"
+
+        return StreamingResponse(generate_small_talk(), media_type="text/event-stream")
 
     if redis_client:
         cached_response = redis_client.get(cache_key)
@@ -1813,18 +1876,22 @@ async def list_sessions(user_id: Optional[str] = None, project_id: Optional[str]
     authenticate_request(authorization, user_id)
     with get_psycopg_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
+            query = """
                 SELECT c.id, c.title, COUNT(m.id)::int AS message_count
                 FROM conversations c
                 LEFT JOIN messages m ON m.conversation_id = c.id
-                WHERE c.user_id = %s::uuid AND c.project_id IS NOT DISTINCT FROM %s
+                WHERE c.user_id = %s::uuid
+                """
+            params: list[object] = [user_id]
+            if project_id is not None:
+                query += " AND c.project_id IS NOT DISTINCT FROM %s"
+                params.append(project_id)
+            query += """
                 GROUP BY c.id, c.title, c.updated_at
                 HAVING COUNT(m.id) > 0
                 ORDER BY c.updated_at DESC
-                """,
-                (user_id, project_id or None),
-            )
+                """
+            cur.execute(query, params)
             return {"sessions": [dict(row) for row in cur.fetchall()]}
 
 
@@ -1832,15 +1899,31 @@ async def list_sessions(user_id: Optional[str] = None, project_id: Optional[str]
 async def get_session(session_id: str, user_id: str, project_id: Optional[str] = None, authorization: Optional[str] = Header(default=None)):
     """Get messages for a specific session."""
     authenticate_request(authorization, user_id)
-    pid = project_id if project_id else ""
-    messages = get_session_messages(user_id, pid, session_id)
+    messages = get_session_messages(user_id, project_id, session_id)
     if not messages:
-        # Check global if project_id was passed but failed
-        if pid:
-            messages = get_session_messages(user_id, "", session_id)
-        if not messages:
-            raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Session not found")
     return {"session_id": session_id, "messages": messages}
+
+
+@app.put("/api/chat/sessions/{session_id}/edit")
+async def edit_session_from_message(
+    session_id: str,
+    payload: EditChatSessionRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Keep turns before a user message so that it can be edited and regenerated."""
+    authenticate_request(authorization, payload.user_id)
+    messages = get_session_messages(payload.user_id, payload.project_id, session_id)
+    message_index = payload.message_index
+
+    if message_index < 0 or message_index >= len(messages):
+        raise HTTPException(status_code=404, detail="Message not found")
+    if messages[message_index].get("role") != "user":
+        raise HTTPException(status_code=400, detail="Only user messages can be edited")
+
+    retained_messages = messages[:message_index]
+    save_session_messages(payload.user_id, payload.project_id, session_id, retained_messages)
+    return {"messages": retained_messages}
 
 
 @app.delete("/api/chat/sessions/{session_id}")

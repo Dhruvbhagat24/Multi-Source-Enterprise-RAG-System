@@ -2,6 +2,7 @@ import uuid
 import unittest
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -18,6 +19,85 @@ def auth_header(user_id: str = USER_ID) -> dict[str, str]:
 
 
 class ApiSecurityTests(unittest.TestCase):
+    def test_edit_session_truncates_from_selected_user_message(self):
+        session_id = str(uuid.uuid4())
+        messages = [
+            {"role": "user", "content": "First question"},
+            {"role": "assistant", "content": "First answer"},
+            {"role": "user", "content": "Second question"},
+            {"role": "assistant", "content": "Second answer"},
+        ]
+
+        with (
+            patch.object(api_server, "get_session_messages", return_value=messages),
+            patch.object(api_server, "save_session_messages") as save_messages,
+        ):
+            response = client.put(
+                f"/api/chat/sessions/{session_id}/edit",
+                json={"user_id": USER_ID, "message_index": 2},
+                headers=auth_header(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages"], messages[:2])
+        self.assertEqual(save_messages.call_args.args[3], messages[:2])
+
+    def test_greeting_and_day_checkin_use_small_talk_responses(self):
+        cases = {
+            "hii": "Hi! How can I help you?",
+            "Hello!": "Hi! How can I help you?",
+            "how was the day?": "I'm doing well, thanks for asking! How can I help you today?",
+        }
+
+        for message, expected_reply in cases.items():
+            with self.subTest(message=message):
+                with (
+                    patch.object(api_server, "get_session_messages", return_value=[]) as load_messages,
+                    patch.object(api_server, "save_session_messages") as save_messages,
+                    patch.object(api_server, "get_vector_store") as get_vector_store,
+                    patch.object(api_server, "redis_client", None),
+                ):
+                    response = client.post(
+                        "/api/chat",
+                        json={"message": message, "user_id": USER_ID},
+                        headers=auth_header(),
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(expected_reply, response.text)
+                self.assertIn('"type": "sources", "data": []', response.text)
+                self.assertIn('"type": "done"', response.text)
+                get_vector_store.assert_not_called()
+                self.assertEqual(len(save_messages.call_args_list), 2)
+
+    def test_chat_without_project_preserves_existing_session_history(self):
+        session_id = str(uuid.uuid4())
+        existing_messages = [
+            {"role": "user", "content": "What is NetWeb?"},
+            {"role": "assistant", "content": "NetWeb is a software company."},
+        ]
+        with (
+            patch.object(api_server, "get_session_messages", return_value=list(existing_messages)) as load_messages,
+            patch.object(api_server, "save_session_messages") as save_messages,
+            patch.object(api_server, "is_documents_intent", return_value=True),
+            patch.object(api_server, "build_documents_inventory_answer", return_value=("There are no documents.", [])),
+        ):
+            response = client.post(
+                "/api/chat",
+                json={
+                    "message": "Summarize the documents",
+                    "user_id": USER_ID,
+                    "session_id": session_id,
+                },
+                headers=auth_header(),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        load_messages.assert_called_once_with(USER_ID, None, session_id)
+        saved_messages = save_messages.call_args_list[0].args[3]
+        self.assertEqual(saved_messages[:2], existing_messages)
+        self.assertEqual(saved_messages[2], {"role": "user", "content": "Summarize the documents"})
+
     def test_access_token_is_bound_to_user_id(self):
         response = client.get(
             "/api/documents",

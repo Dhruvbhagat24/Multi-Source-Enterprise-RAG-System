@@ -1,6 +1,7 @@
 import os
 
 from unstructured.partition.pdf import partition_pdf
+from unstructured.documents.elements import ElementMetadata, Text
 from core.document_ingestor import DocumentIngestor
 
 
@@ -45,6 +46,21 @@ class PDFIngestor(DocumentIngestor):
                 if candidate_strategy != strategy:
                     print(f"✅ PDF fallback succeeded with strategy '{candidate_strategy}'")
                 break
+
+        if not elements:
+            try:
+                from pypdf import PdfReader
+
+                reader = PdfReader(file_path)
+                elements = [
+                    Text(text, metadata=ElementMetadata(page_number=page_number))
+                    for page_number, page in enumerate(reader.pages, start=1)
+                    if (text := (page.extract_text() or "").strip())
+                ]
+                if elements:
+                    print("✅ PDF fallback succeeded with pypdf text extraction")
+            except Exception as exc:
+                print(f"⚠️ PDF pypdf fallback failed: {exc}")
 
         print(f"✅ Extracted {len(elements)} PDF elements")
         return elements
